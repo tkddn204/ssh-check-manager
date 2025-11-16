@@ -11,6 +11,19 @@ const nextConfig = {
         crypto: false,
       };
     }
+
+    // ssh2의 네이티브 모듈(cpu-features)을 외부화
+    config.externals = config.externals || [];
+    config.externals.push({
+      'cpu-features': 'commonjs cpu-features',
+    });
+
+    // 선택적 의존성 무시
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'cpu-features': false,
+    };
+
     return config;
   },
 };
