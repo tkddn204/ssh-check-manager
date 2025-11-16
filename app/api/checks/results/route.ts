@@ -53,7 +53,19 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.checkResult.count({ where });
 
-    return NextResponse.json({ results, count: results.length, total });
+    // 프론트엔드 형식으로 변환 (snake_case)
+    const formattedResults = results.map((result) => ({
+      id: result.id,
+      server_name: result.server.name,
+      command_name: result.command.name,
+      status: result.status,
+      output: result.output,
+      error_message: result.errorMessage,
+      execution_time: result.executionTime,
+      checked_at: result.checkedAt,
+    }));
+
+    return NextResponse.json({ results: formattedResults, count: formattedResults.length, total });
   } catch (error: any) {
     console.error('Failed to fetch check results:', error);
     return NextResponse.json(
