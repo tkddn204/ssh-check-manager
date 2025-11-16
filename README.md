@@ -1,37 +1,45 @@
 # SSH Check Manager
 
-SSH를 통해 원격 서버에 접속하여 점검 명령어를 실행하고, 점검 결과를 일별/월별로 확인할 수 있는 웹 기반 서버 헬스 체크 관리 시스템입니다.
+SSH 서버 상태 점검 및 터널링 관리 시스템입니다. Next.js와 Prisma, MariaDB를 사용하여 구축되었습니다.
 
 ## 주요 기능
 
-### 1. 서버 관리
-- SSH로 접속할 서버 등록 및 관리
-- 비밀번호 또는 SSH 키 기반 인증 지원
-- 서버 정보 수정 및 삭제
+### 1. SSH 터널링 관리
+- **Local Port Forwarding (-L)**: 로컬 포트를 원격 서버로 포워딩
+- **Remote Port Forwarding (-R)**: 원격 포트를 로컬로 포워딩
+- **Dynamic Port Forwarding (-D)**: SOCKS 프록시 생성
 
-### 2. 점검 실행
-- 여러 서버에 대해 여러 점검 명령어 일괄 실행
-- 실시간 점검 결과 확인
-- 점검 결과 이력 저장 및 조회
+### 2. 서버 관리
+- SSH 서버 등록 및 관리
+- 패스워드 또는 키 기반 인증 지원
+- **VPN/특별 프로그램 요구사항 설정**
+  - VPN 클라이언트 설정
+  - 웹 포털 접속 정보
+  - 커스텀 애플리케이션 경로
+  - Bastion 호스트 설정
 
-### 3. 리포트 및 통계
-- 일별/월별 점검 통계 차트
-- 성공률, 실패율, 평균 실행 시간 분석
-- 상세 데이터 테이블 뷰
+### 3. 서버 접속 점검
+- 자동 서버 상태 점검
+- 커스텀 명령어 실행
+- 점검 결과 기록 및 통계
 
 ### 4. 대시보드
-- 전체 시스템 현황 한눈에 확인
-- 등록된 서버 수, 총 점검 수, 성공률 등 주요 지표
-- 최근 점검 결과 미리보기
+- **서버별 월간 접속 현황 캘린더 뷰**
+- 일별 접속 성공/실패 상태 표시
+- 월별 네비게이션
+
+### 5. 리포트
+- 일별/월별 통계
+- 성공률 및 평균 실행 시간 분석
 
 ## 기술 스택
 
-- **Frontend & Backend**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Database**: SQLite3
-- **SSH Client**: ssh2
+- **Frontend**: Next.js 14, React 18, TailwindCSS
+- **Backend**: Next.js API Routes
+- **Database**: MariaDB + Prisma ORM
+- **SSH**: ssh2 (Node.js SSH2 client)
+- **Date Utilities**: date-fns
 - **Charts**: Recharts
-- **Styling**: Tailwind CSS
 
 ## 설치 및 실행
 
@@ -39,65 +47,101 @@ SSH를 통해 원격 서버에 접속하여 점검 명령어를 실행하고, �
 
 ```bash
 npm install
+# 또는
+pnpm install
 ```
 
 ### 2. 환경 변수 설정
 
-`.env.example` 파일을 복사하여 `.env` 파일을 생성합니다:
+`.env` 파일을 생성하고 다음 내용을 추가합니다:
+
+```env
+# MariaDB Database Connection
+DATABASE_URL="mysql://user:password@localhost:3306/ssh_check_manager"
+
+# 개발 환경 예시
+# DATABASE_URL="mysql://root:root@localhost:3306/ssh_check_manager"
+```
+
+### 3. 데이터베이스 설정
 
 ```bash
-cp .env.example .env
+# Prisma Client 생성
+npm run prisma:generate
+
+# 데이터베이스 스키마 푸시 (개발 환경)
+npm run prisma:push
+
+# 또는 마이그레이션 생성 (프로덕션)
+npm run prisma:migrate
 ```
 
-`.env` 파일 내용:
-```
-DB_PATH=./database.db
-```
-
-### 3. 개발 서버 실행
+### 4. 개발 서버 실행
 
 ```bash
 npm run dev
 ```
 
-브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 애플리케이션에 접속합니다.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 확인합니다.
 
-### 4. 프로덕션 빌드
+### 5. Prisma Studio (선택사항)
 
 ```bash
-npm run build
-npm start
+npm run prisma:studio
 ```
 
-## 사용 방법
+## 클라이언트 요구사항 설정
 
-### 서버 추가
+서버에 접속하기 전에 특별한 프로그램이나 VPN 연결이 필요한 경우 다음과 같이 설정할 수 있습니다:
 
-1. 상단 네비게이션에서 "서버 관리" 클릭
-2. "서버 추가" 버튼 클릭
-3. 서버 정보 입력:
-   - 서버 이름
-   - 호스트 (IP 주소 또는 도메인)
-   - 포트 (기본값: 22)
-   - 사용자 이름
-   - 인증 방식 선택 (비밀번호 또는 SSH 키)
-   - 비밀번호 또는 SSH 개인 키 입력
-4. "추가" 버튼 클릭
+### VPN 설정 예시
+```json
+{
+  "vpnName": "Company VPN",
+  "vpnExecutablePath": "C:\\Program Files\\OpenVPN\\bin\\openvpn-gui.exe",
+  "vpnConfigPath": "C:\\Users\\user\\company.ovpn"
+}
+```
 
-### 점검 실행
+### 웹 포털 설정 예시
+```json
+{
+  "webPortalUrl": "https://portal.company.com",
+  "webPortalInstructions": "로그인 후 'SSH 접속' 메뉴에서 세션을 활성화하세요"
+}
+```
 
-1. 상단 네비게이션에서 "점검 실행" 클릭
-2. 점검할 서버 선택 (다중 선택 가능)
-3. 실행할 점검 명령어 선택 (다중 선택 가능)
-4. "점검 실행" 버튼 클릭
-5. 점검 완료 후 결과 확인
+### Bastion 호스트 설정 예시
+```json
+{
+  "bastionHost": "bastion.company.com",
+  "bastionPort": 22,
+  "bastionUsername": "jumpuser",
+  "bastionAuthType": "key",
+  "bastionPrivateKey": "-----BEGIN RSA PRIVATE KEY-----\n..."
+}
+```
 
-### 리포트 확인
+## SSH 터널링 사용 예시
 
-1. 상단 네비게이션에서 "리포트" 클릭
-2. 일별/월별 보기 선택
-3. 기간 선택 (7일, 30일, 90일 또는 6개월, 12개월, 24개월)
-4. 차트와 테이블로 통계 확인
+### Local Port Forwarding
+로컬의 8080 포트를 원격 서버의 localhost:80으로 포워딩:
+- Local Port: 8080
+- Remote Host: localhost
+- Remote Port: 80
+- Tunnel Type: local
+
+### Remote Port Forwarding
+원격 서버의 9000 포트를 로컬의 localhost:3000으로 포워딩:
+- Local Port: 3000
+- Remote Host: (원격 서버 주소)
+- Remote Port: 9000
+- Tunnel Type: remote
+
+### Dynamic Port Forwarding (SOCKS Proxy)
+로컬의 1080 포트에 SOCKS 프록시 생성:
+- Local Port: 1080
+- Tunnel Type: dynamic
 
 ## 기본 제공 점검 명령어
 
@@ -111,131 +155,85 @@ npm start
 6. **System Info**: 시스템 정보 확인 (`uname -a`)
 7. **Disk I/O**: 디스크 I/O 통계 (`iostat 1 5`)
 
-## 데이터베이스 스키마
+## 데이터베이스 스키마 (Prisma)
 
-### servers 테이블
-서버 정보를 저장합니다.
+### Server (서버)
+- 서버 접속 정보 (host, port, username)
+- 인증 방식 (password/key)
+- 클라이언트 요구사항 (VPN, 웹 포털, 커스텀 앱 등)
 
-```sql
-CREATE TABLE servers (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  host TEXT NOT NULL,
-  port INTEGER DEFAULT 22,
-  username TEXT NOT NULL,
-  auth_type TEXT NOT NULL CHECK(auth_type IN ('password', 'key')),
-  password TEXT,
-  private_key TEXT,
-  description TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
+### SSHTunnel (SSH 터널)
+- 터널 타입 (local/remote/dynamic)
+- 포트 포워딩 설정
+- 활성화 상태
 
-### check_commands 테이블
-점검 명령어를 저장합니다.
+### CheckCommand (점검 명령어)
+- 실행할 SSH 명령어
+- 명령어 설명
 
-```sql
-CREATE TABLE check_commands (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  command TEXT NOT NULL,
-  description TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
+### CheckResult (점검 결과)
+- 서버별 점검 기록
+- 성공/실패 상태
+- 실행 시간 및 출력
 
-### check_results 테이블
-점검 결과를 저장합니다.
-
-```sql
-CREATE TABLE check_results (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  server_id INTEGER NOT NULL,
-  command_id INTEGER NOT NULL,
-  output TEXT,
-  status TEXT CHECK(status IN ('success', 'failed', 'error')),
-  error_message TEXT,
-  execution_time INTEGER,
-  checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (server_id) REFERENCES servers (id) ON DELETE CASCADE,
-  FOREIGN KEY (command_id) REFERENCES check_commands (id) ON DELETE CASCADE
-);
-```
+자세한 스키마는 `prisma/schema.prisma` 파일을 참조하세요.
 
 ## API 엔드포인트
 
 ### 서버 관리
-- `GET /api/servers` - 모든 서버 조회
-- `POST /api/servers` - 새 서버 추가
-- `GET /api/servers/:id` - 특정 서버 조회
-- `PUT /api/servers/:id` - 서버 정보 수정
-- `DELETE /api/servers/:id` - 서버 삭제
-
-### 명령어 관리
-- `GET /api/commands` - 모든 점검 명령어 조회
-- `POST /api/commands` - 새 점검 명령어 추가
+- `GET /api/servers` - 서버 목록 조회
+- `POST /api/servers` - 서버 등록
+- `GET /api/servers/[id]` - 서버 상세 조회
+- `PUT /api/servers/[id]` - 서버 정보 수정
+- `DELETE /api/servers/[id]` - 서버 삭제
 
 ### 점검 실행
-- `POST /api/checks/execute` - 단일 점검 실행
-- `POST /api/checks/batch` - 일괄 점검 실행
+- `POST /api/checks/execute` - 점검 실행
+- `POST /api/checks/batch` - 일괄 점검
+- `GET /api/checks/results` - 점검 결과 조회
 
-### 점검 결과
-- `GET /api/checks/results` - 점검 결과 조회 (필터링 지원)
+### 대시보드
+- `GET /api/dashboard/monthly-status` - 서버별 월간 접속 현황
 
 ### 리포트
+- `GET /api/reports/summary` - 전체 통계
 - `GET /api/reports/daily` - 일별 리포트
 - `GET /api/reports/monthly` - 월별 리포트
-- `GET /api/reports/summary` - 전체 통계 요약
 
-## 보안 고려사항
+## 보안 주의사항
 
-1. **SSH 연결**: 모든 SSH 연결은 서버 사이드에서 처리됩니다
-2. **인증 정보**: 비밀번호와 SSH 키는 데이터베이스에 저장되며, API 응답에서는 제외됩니다
-3. **프로덕션 환경**:
-   - 데이터베이스 파일을 안전한 위치에 저장하세요
-   - HTTPS를 사용하세요
-   - 적절한 인증/인가 시스템을 추가하세요 (현재는 미구현)
-   - 환경 변수로 민감한 정보를 관리하세요
+1. **환경 변수**: `.env` 파일은 절대 버전 관리에 포함하지 마세요
+2. **SSH 키**: Private Key는 암호화하여 저장하는 것을 권장합니다
+3. **비밀번호**: 프로덕션 환경에서는 비밀번호 대신 SSH 키 사용을 권장합니다
+4. **데이터베이스**: 프로덕션 환경에서는 강력한 비밀번호와 방화벽 설정 필수
 
-## 개발
-
-### 프로젝트 구조
+## 프로젝트 구조
 
 ```
 ssh-check-manager/
-├── app/                      # Next.js App Router 페이지
-│   ├── api/                 # API 라우트
+├── app/                      # Next.js App Router
+│   ├── api/                 # API Routes
 │   │   ├── servers/        # 서버 관리 API
-│   │   ├── commands/       # 명령어 관리 API
-│   │   ├── checks/         # 점검 실행 API
+│   │   ├── checks/         # 점검 API
+│   │   ├── dashboard/      # 대시보드 API
 │   │   └── reports/        # 리포트 API
 │   ├── servers/            # 서버 관리 페이지
-│   ├── checks/             # 점검 실행 페이지
+│   ├── checks/             # 점검 페이지
 │   ├── reports/            # 리포트 페이지
-│   ├── layout.tsx          # 루트 레이아웃
-│   ├── page.tsx            # 대시보드 페이지
-│   └── globals.css         # 글로벌 스타일
-├── lib/                     # 유틸리티 및 라이브러리
-│   ├── db.ts               # 데이터베이스 연결 및 헬퍼
-│   ├── ssh.ts              # SSH 연결 유틸리티
+│   ├── layout.tsx          # 레이아웃
+│   ├── page.tsx            # 대시보드 (홈)
+│   └── globals.css         # 전역 스타일
+├── lib/                     # 유틸리티 라이브러리
+│   ├── db.ts               # Prisma Client
+│   ├── ssh.ts              # SSH 및 터널링 기능
 │   └── types.ts            # TypeScript 타입 정의
-├── public/                  # 정적 파일
-├── .env.example            # 환경 변수 예제
-├── next.config.js          # Next.js 설정
-├── tailwind.config.js      # Tailwind CSS 설정
-├── tsconfig.json           # TypeScript 설정
-└── package.json            # 프로젝트 의존성
+├── prisma/                  # Prisma 설정
+│   └── schema.prisma       # 데이터베이스 스키마
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
 
 ## 라이선스
 
 MIT License
-
-## 기여
-
-이슈와 풀 리퀘스트는 언제나 환영합니다!
-
-## 문의
-
-프로젝트에 대한 문의사항이 있으시면 이슈를 생성해주세요.

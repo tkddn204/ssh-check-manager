@@ -1,0 +1,118 @@
+// Prisma Schema for SSH Check Manager with MariaDB
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 서버 정보
+model Server {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  host        String   @db.VarChar(255)
+  port        Int      @default(22)
+  username    String   @db.VarChar(255)
+  authType    AuthType @map("auth_type")
+  password    String?  @db.Text
+  privateKey  String?  @map("private_key") @db.Text
+  description String?  @db.Text
+
+  // 클라이언트 요구사항 (VPN, 특별 프로그램 등)
+  requiresClient Boolean @default(false) @map("requires_client")
+  clientType     ClientType? @map("client_type")
+  clientConfig   String? @db.Text @map("client_config") // JSON 형태로 저장
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  checkResults CheckResult[]
+  tunnels      SSHTunnel[]
+
+  @@map("servers")
+}
+
+// SSH 터널링 설정
+model SSHTunnel {
+  id          Int      @id @default(autoincrement())
+  serverId    Int      @map("server_id")
+  name        String   @db.VarChar(255)
+  localPort   Int      @map("local_port")
+  remoteHost  String   @map("remote_host") @db.VarChar(255)
+  remotePort  Int      @map("remote_port")
+  tunnelType  TunnelType @map("tunnel_type")
+  isActive    Boolean  @default(false) @map("is_active")
+  description String?  @db.Text
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@map("ssh_tunnels")
+  @@index([serverId])
+}
+
+// 점검 명령어
+model CheckCommand {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  command     String   @db.Text
+  description String?  @db.Text
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  checkResults CheckResult[]
+
+  @@map("check_commands")
+}
+
+// 점검 결과 (서버 접속 기록)
+model CheckResult {
+  id             Int      @id @default(autoincrement())
+  serverId       Int      @map("server_id")
+  commandId      Int      @map("command_id")
+  output         String?  @db.Text
+  status         CheckStatus
+  errorMessage   String?  @map("error_message") @db.Text
+  executionTime  Int      @map("execution_time") // milliseconds
+
+  checkedAt      DateTime @default(now()) @map("checked_at")
+
+  server         Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  command        CheckCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+
+  @@map("check_results")
+  @@index([serverId])
+  @@index([commandId])
+  @@index([checkedAt])
+}
+
+// Enums
+enum AuthType {
+  password
+  key
+}
+
+enum CheckStatus {
+  success
+  failed
+  error
+}
+
+enum TunnelType {
+  local    // -L: Local port forwarding
+  remote   // -R: Remote port forwarding
+  dynamic  // -D: Dynamic port forwarding (SOCKS proxy)
+}
+
+enum ClientType {
+  vpn            // VPN 프로그램 필요
+  web_portal     // 웹 포털 접속 필요
+  custom_app     // 커스텀 애플리케이션 필요
+  bastion        // Bastion 호스트 경유 필요
+  none           // 요구사항 없음
+}

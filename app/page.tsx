@@ -2,50 +2,75 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { format, eachDayOfInterval, startOfMonth, endOfMonth } from 'date-fns';
 
-interface Summary {
-  total_checks: number;
-  success_count: number;
-  failed_count: number;
-  error_count: number;
-  avg_execution_time: number;
-  first_check: string;
-  last_check: string;
-}
-
-interface Server {
-  id: number;
-  name: string;
+interface ServerMonthlyStatus {
+  serverId: number;
+  serverName: string;
   host: string;
   port: number;
+  dailyStatus: {
+    [day: string]: {
+      hasConnection: boolean;
+      successCount: number;
+      failedCount: number;
+      lastCheckedAt?: string;
+    };
+  };
+}
+
+interface DashboardData {
+  year: number;
+  month: number;
+  monthlyStatus: ServerMonthlyStatus[];
 }
 
 export default function Dashboard() {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [servers, setServers] = useState<Server[]>([]);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedMonth]);
 
   const fetchData = async () => {
     try {
-      const [summaryRes, serversRes] = await Promise.all([
-        fetch('/api/reports/summary'),
-        fetch('/api/servers'),
-      ]);
+      const year = selectedMonth.getFullYear();
+      const month = selectedMonth.getMonth() + 1;
 
-      const summaryData = await summaryRes.json();
-      const serversData = await serversRes.json();
+      const response = await fetch(`/api/dashboard/monthly-status?year=${year}&month=${month}`);
+      const result = await response.json();
 
-      setSummary(summaryData.summary);
-      setServers(serversData.servers || []);
+      setData(result);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getDaysInMonth = () => {
+    if (!data) return [];
+    const start = startOfMonth(new Date(data.year, data.month - 1));
+    const end = endOfMonth(new Date(data.year, data.month - 1));
+    return eachDayOfInterval({ start, end });
+  };
+
+  const getStatusColor = (status: { hasConnection: boolean; successCount: number; failedCount: number }) => {
+    if (!status.hasConnection) {
+      return 'bg-gray-200'; // 접속 없음
+    }
+    if (status.failedCount > 0) {
+      return 'bg-red-500'; // 실패 있음
+    }
+    return 'bg-green-500'; // 모두 성공
+  };
+
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(selectedMonth);
+    newDate.setMonth(newDate.getMonth() + offset);
+    setSelectedMonth(newDate);
   };
 
   if (loading) {
@@ -56,102 +81,15 @@ export default function Dashboard() {
     );
   }
 
-  const successRate = summary && summary.total_checks > 0
-    ? ((summary.success_count / summary.total_checks) * 100).toFixed(1)
-    : '0';
+  const days = getDaysInMonth();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">대시보드</h1>
         <p className="mt-2 text-sm text-gray-600">
-          서버 상태 점검 현황을 한눈에 확인하세요
+          서버별 월간 접속 현황을 확인하세요
         </p>
-      </div>
-
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="text-3xl">🖥️</div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    등록된 서버
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {servers.length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="text-3xl">✅</div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    총 점검 수
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {summary?.total_checks || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="text-3xl">📊</div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    성공률
-                  </dt>
-                  <dd className="text-2xl font-semibold text-green-600">
-                    {successRate}%
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="text-3xl">⚡</div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    평균 실행 시간
-                  </dt>
-                  <dd className="text-2xl font-semibold text-gray-900">
-                    {summary?.avg_execution_time
-                      ? `${Math.round(summary.avg_execution_time)}ms`
-                      : 'N/A'}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* 빠른 시작 */}
@@ -160,13 +98,12 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Link
             href="/servers"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
+            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
           >
             <div className="flex-shrink-0">
               <span className="text-2xl">➕</span>
             </div>
             <div className="flex-1 min-w-0">
-              <span className="absolute inset-0" aria-hidden="true" />
               <p className="text-sm font-medium text-gray-900">서버 추가</p>
               <p className="text-sm text-gray-500 truncate">
                 새로운 서버 등록
@@ -176,13 +113,12 @@ export default function Dashboard() {
 
           <Link
             href="/checks"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
+            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
           >
             <div className="flex-shrink-0">
               <span className="text-2xl">🔍</span>
             </div>
             <div className="flex-1 min-w-0">
-              <span className="absolute inset-0" aria-hidden="true" />
               <p className="text-sm font-medium text-gray-900">점검 실행</p>
               <p className="text-sm text-gray-500 truncate">
                 서버 상태 점검
@@ -192,13 +128,12 @@ export default function Dashboard() {
 
           <Link
             href="/reports"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
+            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
           >
             <div className="flex-shrink-0">
               <span className="text-2xl">📈</span>
             </div>
             <div className="flex-1 min-w-0">
-              <span className="absolute inset-0" aria-hidden="true" />
               <p className="text-sm font-medium text-gray-900">리포트 보기</p>
               <p className="text-sm text-gray-500 truncate">
                 일별/월별 통계
@@ -208,52 +143,108 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 서버 목록 미리보기 */}
-      {servers.length > 0 && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-900">등록된 서버</h2>
-            <Link
-              href="/servers"
-              className="text-sm text-primary-600 hover:text-primary-500"
+      {/* 월간 접속 현황 */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-lg font-medium text-gray-900">서버별 월간 접속 현황</h2>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => changeMonth(-1)}
+              className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50"
             >
-              모두 보기 →
-            </Link>
+              이전 달
+            </button>
+            <span className="font-medium">
+              {data && `${data.year}년 ${data.month}월`}
+            </span>
+            <button
+              onClick={() => changeMonth(1)}
+              className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              다음 달
+            </button>
           </div>
-          <div className="overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+        </div>
+
+        {data && data.monthlyStatus.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    이름
+                  <th className="sticky left-0 z-10 bg-white px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                    서버
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    호스트
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    포트
-                  </th>
+                  {days.map((day) => (
+                    <th
+                      key={format(day, 'yyyy-MM-dd')}
+                      className="px-2 py-2 text-center text-xs font-medium text-gray-500"
+                    >
+                      {format(day, 'd')}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {servers.slice(0, 5).map((server) => (
-                  <tr key={server.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {server.name}
+                {data.monthlyStatus.map((server) => (
+                  <tr key={server.serverId}>
+                    <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r">
+                      <div className="text-sm font-medium text-gray-900">
+                        {server.serverName}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {server.host}:{server.port}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {server.host}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {server.port}
-                    </td>
+                    {days.map((day) => {
+                      const dayKey = format(day, 'yyyy-MM-dd');
+                      const status = server.dailyStatus[dayKey];
+                      return (
+                        <td
+                          key={dayKey}
+                          className="px-2 py-3 text-center"
+                          title={
+                            status.hasConnection
+                              ? `성공: ${status.successCount}, 실패: ${status.failedCount}`
+                              : '접속 없음'
+                          }
+                        >
+                          <div
+                            className={`w-6 h-6 mx-auto rounded ${getStatusColor(status)}`}
+                          />
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        ) : (
+          <div className="text-center py-12 text-gray-500">
+            등록된 서버가 없습니다.{' '}
+            <Link href="/servers" className="text-blue-600 hover:text-blue-500">
+              서버를 추가
+            </Link>
+            해주세요.
+          </div>
+        )}
+
+        {/* 범례 */}
+        <div className="mt-6 flex items-center justify-center space-x-6 text-sm">
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-green-500 rounded"></div>
+            <span>접속 성공</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-red-500 rounded"></div>
+            <span>접속 실패</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-gray-200 rounded"></div>
+            <span>접속 없음</span>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
