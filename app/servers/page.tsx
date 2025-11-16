@@ -11,6 +11,9 @@ interface Server {
   authType: 'password' | 'key';
   description?: string;
   createdAt: string;
+  requiresClient?: boolean;
+  clientType?: 'vpn' | 'web_portal' | 'custom_app' | 'bastion' | 'none';
+  clientConfig?: string;
 }
 
 export default function ServersPage() {
@@ -26,6 +29,25 @@ export default function ServersPage() {
     password: '',
     privateKey: '',
     description: '',
+    requiresClient: false,
+    clientType: 'none' as 'vpn' | 'web_portal' | 'custom_app' | 'bastion' | 'none',
+    // VPN 설정
+    vpnName: '',
+    vpnExecutablePath: '',
+    vpnConfigPath: '',
+    // 웹 포털 설정
+    webPortalUrl: '',
+    webPortalInstructions: '',
+    // 커스텀 앱 설정
+    customAppPath: '',
+    customAppArgs: '',
+    // Bastion 설정
+    bastionHost: '',
+    bastionPort: 22,
+    bastionUsername: '',
+    bastionAuthType: 'password' as 'password' | 'key',
+    bastionPassword: '',
+    bastionPrivateKey: '',
   });
 
   useEffect(() => {
@@ -47,10 +69,58 @@ export default function ServersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // clientConfig JSON 생성
+      let clientConfig = null;
+      if (formData.requiresClient && formData.clientType !== 'none') {
+        switch (formData.clientType) {
+          case 'vpn':
+            clientConfig = JSON.stringify({
+              vpnName: formData.vpnName,
+              vpnExecutablePath: formData.vpnExecutablePath,
+              vpnConfigPath: formData.vpnConfigPath,
+            });
+            break;
+          case 'web_portal':
+            clientConfig = JSON.stringify({
+              webPortalUrl: formData.webPortalUrl,
+              webPortalInstructions: formData.webPortalInstructions,
+            });
+            break;
+          case 'custom_app':
+            clientConfig = JSON.stringify({
+              customAppPath: formData.customAppPath,
+              customAppArgs: formData.customAppArgs,
+            });
+            break;
+          case 'bastion':
+            clientConfig = JSON.stringify({
+              bastionHost: formData.bastionHost,
+              bastionPort: formData.bastionPort,
+              bastionUsername: formData.bastionUsername,
+              bastionAuthType: formData.bastionAuthType,
+              bastionPassword: formData.bastionAuthType === 'password' ? formData.bastionPassword : null,
+              bastionPrivateKey: formData.bastionAuthType === 'key' ? formData.bastionPrivateKey : null,
+            });
+            break;
+        }
+      }
+
       const res = await fetch('/api/servers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          host: formData.host,
+          port: formData.port,
+          username: formData.username,
+          authType: formData.authType,
+          password: formData.password,
+          privateKey: formData.privateKey,
+          description: formData.description,
+          requiresClient: formData.requiresClient,
+          clientType: formData.requiresClient ? formData.clientType : null,
+          clientConfig,
+        }),
       });
 
       if (res.ok) {
@@ -64,6 +134,21 @@ export default function ServersPage() {
           password: '',
           privateKey: '',
           description: '',
+          requiresClient: false,
+          clientType: 'none',
+          vpnName: '',
+          vpnExecutablePath: '',
+          vpnConfigPath: '',
+          webPortalUrl: '',
+          webPortalInstructions: '',
+          customAppPath: '',
+          customAppArgs: '',
+          bastionHost: '',
+          bastionPort: 22,
+          bastionUsername: '',
+          bastionAuthType: 'password',
+          bastionPassword: '',
+          bastionPrivateKey: '',
         });
         fetchServers();
       } else {
@@ -158,7 +243,7 @@ export default function ServersPage() {
                       <h3 className="text-lg font-medium text-gray-900">
                         {server.name}
                       </h3>
-                      <div className="mt-2 flex items-center text-sm text-gray-500">
+                      <div className="mt-2 flex items-center text-sm text-gray-500 flex-wrap">
                         <span className="flex items-center">
                           <span className="font-semibold mr-2">호스트:</span>
                           {server.host}:{server.port}
@@ -173,6 +258,18 @@ export default function ServersPage() {
                           <span className="font-semibold mr-2">인증:</span>
                           {server.authType === 'password' ? '비밀번호' : 'SSH 키'}
                         </span>
+                        {server.requiresClient && server.clientType && server.clientType !== 'none' && (
+                          <>
+                            <span className="mx-2">•</span>
+                            <span className="flex items-center">
+                              <span className="font-semibold mr-2">클라이언트:</span>
+                              {server.clientType === 'vpn' && 'VPN'}
+                              {server.clientType === 'web_portal' && '웹 포털'}
+                              {server.clientType === 'custom_app' && '커스텀 앱'}
+                              {server.clientType === 'bastion' && 'Bastion 호스트'}
+                            </span>
+                          </>
+                        )}
                       </div>
                       {server.description && (
                         <p className="mt-2 text-sm text-gray-600">
@@ -347,6 +444,273 @@ export default function ServersPage() {
                         }
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                       />
+                    </div>
+
+                    {/* 클라이언트 요구사항 */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="requiresClient"
+                          checked={formData.requiresClient}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              requiresClient: e.target.checked,
+                              clientType: e.target.checked ? formData.clientType : 'none',
+                            })
+                          }
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        />
+                        <label
+                          htmlFor="requiresClient"
+                          className="ml-2 block text-sm font-medium text-gray-700"
+                        >
+                          접속 전 특별한 클라이언트 필요 (VPN, 웹 포털 등)
+                        </label>
+                      </div>
+
+                      {formData.requiresClient && (
+                        <>
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">
+                              클라이언트 유형
+                            </label>
+                            <select
+                              value={formData.clientType}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  clientType: e.target.value as any,
+                                })
+                              }
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            >
+                              <option value="none">없음</option>
+                              <option value="vpn">VPN 클라이언트</option>
+                              <option value="web_portal">웹 포털</option>
+                              <option value="custom_app">커스텀 애플리케이션</option>
+                              <option value="bastion">Bastion 호스트</option>
+                            </select>
+                          </div>
+
+                          {/* VPN 설정 */}
+                          {formData.clientType === 'vpn' && (
+                            <div className="space-y-3 bg-gray-50 p-3 rounded">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  VPN 이름
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.vpnName}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, vpnName: e.target.value })
+                                  }
+                                  placeholder="Company VPN"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  VPN 실행 파일 경로
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.vpnExecutablePath}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, vpnExecutablePath: e.target.value })
+                                  }
+                                  placeholder="C:\Program Files\OpenVPN\bin\openvpn-gui.exe"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  VPN 설정 파일 경로
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.vpnConfigPath}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, vpnConfigPath: e.target.value })
+                                  }
+                                  placeholder="C:\Users\user\company.ovpn"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 웹 포털 설정 */}
+                          {formData.clientType === 'web_portal' && (
+                            <div className="space-y-3 bg-gray-50 p-3 rounded">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  웹 포털 URL
+                                </label>
+                                <input
+                                  type="url"
+                                  value={formData.webPortalUrl}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, webPortalUrl: e.target.value })
+                                  }
+                                  placeholder="https://portal.company.com"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  안내 사항
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={formData.webPortalInstructions}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, webPortalInstructions: e.target.value })
+                                  }
+                                  placeholder="로그인 후 'SSH 접속' 메뉴에서 세션을 활성화하세요"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 커스텀 앱 설정 */}
+                          {formData.clientType === 'custom_app' && (
+                            <div className="space-y-3 bg-gray-50 p-3 rounded">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  애플리케이션 경로
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.customAppPath}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, customAppPath: e.target.value })
+                                  }
+                                  placeholder="C:\Program Files\CustomApp\app.exe"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  실행 인자 (선택)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.customAppArgs}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, customAppArgs: e.target.value })
+                                  }
+                                  placeholder="--connect --profile=production"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Bastion 호스트 설정 */}
+                          {formData.clientType === 'bastion' && (
+                            <div className="space-y-3 bg-gray-50 p-3 rounded">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700">
+                                    Bastion 호스트
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={formData.bastionHost}
+                                    onChange={(e) =>
+                                      setFormData({ ...formData, bastionHost: e.target.value })
+                                    }
+                                    placeholder="bastion.company.com"
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700">
+                                    포트
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={formData.bastionPort}
+                                    onChange={(e) =>
+                                      setFormData({
+                                        ...formData,
+                                        bastionPort: parseInt(e.target.value),
+                                      })
+                                    }
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  사용자 이름
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.bastionUsername}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, bastionUsername: e.target.value })
+                                  }
+                                  placeholder="jumpuser"
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700">
+                                  인증 방식
+                                </label>
+                                <select
+                                  value={formData.bastionAuthType}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      bastionAuthType: e.target.value as 'password' | 'key',
+                                    })
+                                  }
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                >
+                                  <option value="password">비밀번호</option>
+                                  <option value="key">SSH 키</option>
+                                </select>
+                              </div>
+                              {formData.bastionAuthType === 'password' ? (
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700">
+                                    비밀번호
+                                  </label>
+                                  <input
+                                    type="password"
+                                    value={formData.bastionPassword}
+                                    onChange={(e) =>
+                                      setFormData({ ...formData, bastionPassword: e.target.value })
+                                    }
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              ) : (
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700">
+                                    SSH 개인 키
+                                  </label>
+                                  <textarea
+                                    rows={3}
+                                    value={formData.bastionPrivateKey}
+                                    onChange={(e) =>
+                                      setFormData({ ...formData, bastionPrivateKey: e.target.value })
+                                    }
+                                    placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;..."
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
