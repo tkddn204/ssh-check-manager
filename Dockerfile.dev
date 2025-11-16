@@ -1,0 +1,22 @@
+# 개발용 Dockerfile (선택사항)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 의존성 설치
+COPY package*.json ./
+COPY pnpm-lock.yaml* ./
+
+RUN npm install -g pnpm && pnpm install
+
+# 소스 코드 복사
+COPY . .
+
+# Prisma 클라이언트 생성
+RUN pnpm prisma:generate
+
+# 포트 노출
+EXPOSE 3000
+
+# 개발 서버 실행
+CMD ["pnpm", "dev"]

@@ -43,7 +43,21 @@ SSH 서버 상태 점검 및 터널링 관리 시스템입니다. Next.js와 Pri
 
 ## 설치 및 실행
 
-### 1. 의존성 설치
+### 옵션 A: Docker 사용 (권장)
+
+Docker를 사용하면 MariaDB를 손쉽게 실행할 수 있습니다.
+
+#### 1. Docker Compose 실행
+
+```bash
+# 환경 변수 파일 생성
+cp .env.local.example .env
+
+# Docker Compose 실행
+docker-compose up -d
+```
+
+#### 2. 의존성 설치
 
 ```bash
 npm install
@@ -51,7 +65,38 @@ npm install
 pnpm install
 ```
 
-### 2. 환경 변수 설정
+#### 3. 데이터베이스 설정
+
+```bash
+npm run prisma:generate
+npm run prisma:push
+```
+
+#### 4. 개발 서버 실행
+
+```bash
+npm run dev
+```
+
+**서비스 접속:**
+- Next.js 앱: http://localhost:3000
+- Adminer (DB 관리): http://localhost:8080
+
+자세한 내용은 [DOCKER.md](./DOCKER.md)를 참조하세요.
+
+---
+
+### 옵션 B: 로컬 MariaDB 사용
+
+#### 1. 의존성 설치
+
+```bash
+npm install
+# 또는
+pnpm install
+```
+
+#### 2. 환경 변수 설정
 
 `.env` 파일을 생성하고 다음 내용을 추가합니다:
 

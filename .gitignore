@@ -29,9 +29,13 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
 
 # vercel
 .vercel
+
+# Docker
+mariadb-backup.tar.gz
 
 # typescript
 *.tsbuildinfo
