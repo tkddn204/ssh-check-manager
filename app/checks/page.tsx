@@ -6,6 +6,8 @@ interface Server {
   id: number;
   name: string;
   host: string;
+  port: number;
+  username: string;
 }
 
 interface Command {
@@ -86,6 +88,22 @@ export default function ChecksPage() {
     );
   };
 
+  const handleSelectAllServers = () => {
+    if (selectedServers.length === servers.length) {
+      setSelectedServers([]);
+    } else {
+      setSelectedServers(servers.map((s) => s.id));
+    }
+  };
+
+  const handleSelectAllCommands = () => {
+    if (selectedCommands.length === commands.length) {
+      setSelectedCommands([]);
+    } else {
+      setSelectedCommands(commands.map((c) => c.id));
+    }
+  };
+
   const handleExecute = async () => {
     if (selectedServers.length === 0 || selectedCommands.length === 0) {
       alert('서버와 명령어를 최소 하나씩 선택해주세요.');
@@ -160,9 +178,19 @@ export default function ChecksPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* 서버 선택 */}
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
-            서버 선택 ({selectedServers.length})
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-gray-900">
+              서버 선택 ({selectedServers.length}/{servers.length})
+            </h2>
+            {servers.length > 0 && (
+              <button
+                onClick={handleSelectAllServers}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                {selectedServers.length === servers.length ? '전체 해제' : '모두 선택'}
+              </button>
+            )}
+          </div>
           {servers.length === 0 ? (
             <p className="text-sm text-gray-500">등록된 서버가 없습니다.</p>
           ) : (
@@ -181,7 +209,7 @@ export default function ChecksPage() {
                     className="ml-3 block text-sm text-gray-700"
                   >
                     <span className="font-medium">{server.name}</span>
-                    <span className="text-gray-500"> ({server.host})</span>
+                    <span className="text-gray-500"> ({server.username}@{server.host}:{server.port})</span>
                   </label>
                 </div>
               ))}
@@ -191,9 +219,19 @@ export default function ChecksPage() {
 
         {/* 명령어 선택 */}
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
-            명령어 선택 ({selectedCommands.length})
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-gray-900">
+              명령어 선택 ({selectedCommands.length}/{commands.length})
+            </h2>
+            {commands.length > 0 && (
+              <button
+                onClick={handleSelectAllCommands}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                {selectedCommands.length === commands.length ? '전체 해제' : '모두 선택'}
+              </button>
+            )}
+          </div>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {commands.map((command) => (
               <div key={command.id} className="flex items-start">

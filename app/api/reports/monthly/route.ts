@@ -35,7 +35,17 @@ export async function GET(request: NextRequest) {
 
     const reports = await prisma.$queryRawUnsafe(sql, ...params) as any[];
 
-    return NextResponse.json({ reports });
+    // BigInt를 Number로 변환
+    const serializedReports = reports.map((report) => ({
+      month: report.month,
+      total_checks: Number(report.total_checks),
+      success_count: Number(report.success_count),
+      failed_count: Number(report.failed_count),
+      error_count: Number(report.error_count),
+      avg_execution_time: report.avg_execution_time,
+    }));
+
+    return NextResponse.json({ reports: serializedReports });
   } catch (error: any) {
     console.error('Failed to fetch monthly reports:', error);
     return NextResponse.json(
