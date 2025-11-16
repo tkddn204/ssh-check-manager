@@ -31,15 +31,20 @@ docker-compose logs -f
 
 ### 3. 데이터베이스 마이그레이션
 
-컨테이너가 실행된 후, 로컬에서 Prisma 마이그레이션 실행:
+컨테이너가 실행된 후, 로컬에서 Prisma 설정 실행:
 
 ```bash
 # Prisma Client 생성
 npm run prisma:generate
 
-# 데이터베이스 스키마 푸시
+# 개발 환경: 스키마 푸시 (권장)
 npm run prisma:push
+
+# 또는 프로덕션: 마이그레이션 생성
+# npm run prisma:migrate
 ```
+
+**참고**: 개발 환경에서는 `prisma db push`를 사용하는 것을 권장합니다. `prisma migrate`는 shadow database 권한이 필요합니다.
 
 ### 4. Next.js 개발 서버 실행
 
@@ -120,6 +125,48 @@ npm run prisma:studio
 브라우저에서 자동으로 http://localhost:5555가 열립니다.
 
 ## 트러블슈팅
+
+### Prisma Migrate Shadow Database 권한 오류
+
+**오류 메시지**:
+```
+Error: P3014
+Prisma Migrate could not create the shadow database.
+User was denied access on the database `prisma_migrate_shadow_db_...`
+```
+
+**해결 방법 1 (권장)**: 개발 환경에서는 `prisma db push` 사용
+
+```bash
+pnpm dlx prisma db push
+# 또는
+npm run prisma:push
+```
+
+**해결 방법 2**: MariaDB 사용자에게 권한 부여
+
+```bash
+# MariaDB 컨테이너 접속
+docker-compose exec mariadb mysql -u root -p
+# 비밀번호: root
+```
+
+MySQL 프롬프트에서:
+```sql
+GRANT CREATE ON *.* TO 'ssh_user'@'%';
+GRANT ALL PRIVILEGES ON `prisma_migrate_shadow_db_%`.* TO 'ssh_user'@'%';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+**해결 방법 3**: Docker 컨테이너 재생성
+
+init-db 스크립트가 업데이트되었으므로 컨테이너를 다시 만듭니다:
+
+```bash
+docker-compose down -v
+docker-compose up -d
+```
 
 ### 포트 충돌
 
