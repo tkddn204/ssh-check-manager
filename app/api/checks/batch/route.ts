@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuery, runQuery, allQuery } from '@/lib/db';
-import { Server, CheckCommand } from '@/lib/types';
+import { prisma } from '@/lib/db';
 import { executeSSHCommand } from '@/lib/ssh';
+import { CheckStatus } from '@/lib/types';
 
 // POST: 여러 서버에 대해 여러 명령 일괄 실행
 export async function POST(request: NextRequest) {
@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
 
     // 각 서버에 대해
     for (const server_id of server_ids) {
-      const server = await getQuery<Server>('SELECT * FROM servers WHERE id = ?', [server_id]);
+      const server = await prisma.server.findUnique({
+        where: { id: parseInt(server_id) },
+      });
+
       if (!server) {
         results.push({
           server_id,
@@ -41,7 +44,10 @@ export async function POST(request: NextRequest) {
 
       // 각 명령어 실행
       for (const command_id of command_ids) {
-        const command = await getQuery<CheckCommand>('SELECT * FROM check_commands WHERE id = ?', [command_id]);
+        const command = await prisma.checkCommand.findUnique({
+          where: { id: parseInt(command_id) },
+        });
+
         if (!command) {
           serverResults.push({
             command_id,
@@ -54,19 +60,18 @@ export async function POST(request: NextRequest) {
         const result = await executeSSHCommand(server, command.command);
 
         // 결과 저장
-        const status = result.success ? 'success' : (result.error ? 'error' : 'failed');
-        await runQuery(
-          `INSERT INTO check_results (server_id, command_id, output, status, error_message, execution_time)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            server_id,
-            command_id,
-            result.output || null,
+        const status: CheckStatus = result.success ? 'success' : (result.error ? 'error' : 'failed');
+        
+        await prisma.checkResult.create({
+          data: {
+            serverId: parseInt(server_id),
+            commandId: parseInt(command_id),
+            output: result.output || null,
             status,
-            result.error || null,
-            result.executionTime,
-          ]
-        );
+            errorMessage: result.error || null,
+            executionTime: result.executionTime,
+          },
+        });
 
         serverResults.push({
           command_id,
@@ -88,6 +93,7 @@ export async function POST(request: NextRequest) {
       results,
     });
   } catch (error: any) {
+    console.error('Failed to execute batch check:', error);
     return NextResponse.json(
       { error: 'Failed to execute batch check', details: error.message },
       { status: 500 }

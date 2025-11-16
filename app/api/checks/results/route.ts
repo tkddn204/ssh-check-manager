@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { allQuery } from '@/lib/db';
-import { CheckResultWithDetails } from '@/lib/types';
+import { prisma } from '@/lib/db';
+import { CheckStatus } from '@/lib/types';
 
 // GET: 점검 결과 조회 (필터링 및 페이징 지원)
 export async function GET(request: NextRequest) {
@@ -12,41 +12,50 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    let query = `
-      SELECT
-        cr.*,
-        s.name as server_name,
-        cc.name as command_name,
-        cc.command as command
-      FROM check_results cr
-      JOIN servers s ON cr.server_id = s.id
-      JOIN check_commands cc ON cr.command_id = cc.id
-      WHERE 1=1
-    `;
-    const params: any[] = [];
+    const where: any = {};
 
     if (server_id) {
-      query += ' AND cr.server_id = ?';
-      params.push(server_id);
+      where.serverId = parseInt(server_id);
     }
 
     if (command_id) {
-      query += ' AND cr.command_id = ?';
-      params.push(command_id);
+      where.commandId = parseInt(command_id);
     }
 
     if (status) {
-      query += ' AND cr.status = ?';
-      params.push(status);
+      where.status = status as CheckStatus;
     }
 
-    query += ' ORDER BY cr.checked_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    const results = await prisma.checkResult.findMany({
+      where,
+      include: {
+        server: {
+          select: {
+            id: true,
+            name: true,
+            host: true,
+          },
+        },
+        command: {
+          select: {
+            id: true,
+            name: true,
+            command: true,
+          },
+        },
+      },
+      orderBy: {
+        checkedAt: 'desc',
+      },
+      take: limit,
+      skip: offset,
+    });
 
-    const results = await allQuery<CheckResultWithDetails>(query, params);
+    const total = await prisma.checkResult.count({ where });
 
-    return NextResponse.json({ results, count: results.length });
+    return NextResponse.json({ results, count: results.length, total });
   } catch (error: any) {
+    console.error('Failed to fetch check results:', error);
     return NextResponse.json(
       { error: 'Failed to fetch check results', details: error.message },
       { status: 500 }

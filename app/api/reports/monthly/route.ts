@@ -1,38 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { allQuery } from '@/lib/db';
-import { MonthlyReport } from '@/lib/types';
+import { prisma } from '@/lib/db';
+import { subMonths } from 'date-fns';
 
 // GET: 월별 리포트 조회
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const months = parseInt(searchParams.get('months') || '12'); // 기본 12개월
+    const months = parseInt(searchParams.get('months') || '12');
     const server_id = searchParams.get('server_id');
 
-    let query = `
+    const startDate = subMonths(new Date(), months);
+
+    // Prisma raw query 사용 (MySQL용)
+    let sql = `
       SELECT
-        strftime('%Y-%m', checked_at) as month,
+        DATE_FORMAT(checked_at, '%Y-%m') as month,
         COUNT(*) as total_checks,
         SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count,
         SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
         AVG(execution_time) as avg_execution_time
       FROM check_results
-      WHERE checked_at >= datetime('now', '-' || ? || ' months')
+      WHERE checked_at >= ?
     `;
-    const params: any[] = [months];
+
+    const params: any[] = [startDate];
 
     if (server_id) {
-      query += ' AND server_id = ?';
-      params.push(server_id);
+      sql += ' AND server_id = ?';
+      params.push(parseInt(server_id));
     }
 
-    query += ' GROUP BY strftime("%Y-%m", checked_at) ORDER BY month DESC';
+    sql += ' GROUP BY DATE_FORMAT(checked_at, "%Y-%m") ORDER BY month DESC';
 
-    const reports = await allQuery<MonthlyReport>(query, params);
+    const reports = await prisma.$queryRawUnsafe(sql, ...params) as any[];
 
     return NextResponse.json({ reports });
   } catch (error: any) {
+    console.error('Failed to fetch monthly reports:', error);
     return NextResponse.json(
       { error: 'Failed to fetch monthly reports', details: error.message },
       { status: 500 }

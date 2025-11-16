@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { allQuery } from '@/lib/db';
-import { DailyReport } from '@/lib/types';
+import { prisma } from '@/lib/db';
+import { subDays } from 'date-fns';
 
 // GET: 일별 리포트 조회
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const days = parseInt(searchParams.get('days') || '30'); // 기본 30일
+    const days = parseInt(searchParams.get('days') || '30');
     const server_id = searchParams.get('server_id');
 
-    let query = `
+    const startDate = subDays(new Date(), days);
+
+    // Prisma raw query 사용
+    let sql = `
       SELECT
         DATE(checked_at) as date,
         COUNT(*) as total_checks,
@@ -18,21 +21,23 @@ export async function GET(request: NextRequest) {
         SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
         AVG(execution_time) as avg_execution_time
       FROM check_results
-      WHERE checked_at >= datetime('now', '-' || ? || ' days')
+      WHERE checked_at >= ?
     `;
-    const params: any[] = [days];
+
+    const params: any[] = [startDate];
 
     if (server_id) {
-      query += ' AND server_id = ?';
-      params.push(server_id);
+      sql += ' AND server_id = ?';
+      params.push(parseInt(server_id));
     }
 
-    query += ' GROUP BY DATE(checked_at) ORDER BY date DESC';
+    sql += ' GROUP BY DATE(checked_at) ORDER BY date DESC';
 
-    const reports = await allQuery<DailyReport>(query, params);
+    const reports = await prisma.$queryRawUnsafe(sql, ...params) as any[];
 
     return NextResponse.json({ reports });
   } catch (error: any) {
+    console.error('Failed to fetch daily reports:', error);
     return NextResponse.json(
       { error: 'Failed to fetch daily reports', details: error.message },
       { status: 500 }

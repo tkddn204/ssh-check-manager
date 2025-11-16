@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuery, runQuery } from '@/lib/db';
-import { Server } from '@/lib/types';
+import { prisma } from '@/lib/db';
+import { AuthType, ClientType } from '@/lib/types';
 
 // GET: 특정 서버 조회
 export async function GET(
@@ -8,17 +8,31 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const server = await getQuery<Server>('SELECT * FROM servers WHERE id = ?', [params.id]);
+    const server = await prisma.server.findUnique({
+      where: { id: parseInt(params.id) },
+      select: {
+        id: true,
+        name: true,
+        host: true,
+        port: true,
+        username: true,
+        authType: true,
+        description: true,
+        requiresClient: true,
+        clientType: true,
+        clientConfig: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     if (!server) {
       return NextResponse.json({ error: 'Server not found' }, { status: 404 });
     }
 
-    // 비밀번호와 개인키는 응답에서 제외 (보안)
-    const { password, private_key, ...sanitizedServer } = server;
-
-    return NextResponse.json({ server: sanitizedServer });
+    return NextResponse.json({ server });
   } catch (error: any) {
+    console.error('Failed to fetch server:', error);
     return NextResponse.json(
       { error: 'Failed to fetch server', details: error.message },
       { status: 500 }
@@ -33,59 +47,54 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { name, host, port, username, auth_type, password, private_key, description } = body;
+    const {
+      name,
+      host,
+      port,
+      username,
+      authType,
+      password,
+      privateKey,
+      description,
+      requiresClient,
+      clientType,
+      clientConfig
+    } = body;
 
-    const updates: string[] = [];
-    const values: any[] = [];
+    const updateData: any = {};
 
-    if (name) {
-      updates.push('name = ?');
-      values.push(name);
-    }
-    if (host) {
-      updates.push('host = ?');
-      values.push(host);
-    }
-    if (port) {
-      updates.push('port = ?');
-      values.push(port);
-    }
-    if (username) {
-      updates.push('username = ?');
-      values.push(username);
-    }
-    if (auth_type) {
-      updates.push('auth_type = ?');
-      values.push(auth_type);
-    }
-    if (password !== undefined) {
-      updates.push('password = ?');
-      values.push(password);
-    }
-    if (private_key !== undefined) {
-      updates.push('private_key = ?');
-      values.push(private_key);
-    }
-    if (description !== undefined) {
-      updates.push('description = ?');
-      values.push(description);
-    }
+    if (name !== undefined) updateData.name = name;
+    if (host !== undefined) updateData.host = host;
+    if (port !== undefined) updateData.port = port;
+    if (username !== undefined) updateData.username = username;
+    if (authType !== undefined) updateData.authType = authType as AuthType;
+    if (password !== undefined) updateData.password = password;
+    if (privateKey !== undefined) updateData.privateKey = privateKey;
+    if (description !== undefined) updateData.description = description;
+    if (requiresClient !== undefined) updateData.requiresClient = requiresClient;
+    if (clientType !== undefined) updateData.clientType = clientType as ClientType | null;
+    if (clientConfig !== undefined) updateData.clientConfig = clientConfig;
 
-    updates.push('updated_at = CURRENT_TIMESTAMP');
-
-    if (updates.length === 1) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
-    values.push(params.id);
+    const server = await prisma.server.update({
+      where: { id: parseInt(params.id) },
+      data: updateData,
+    });
 
-    await runQuery(
-      `UPDATE servers SET ${updates.join(', ')} WHERE id = ?`,
-      values
-    );
-
-    return NextResponse.json({ message: 'Server updated successfully' });
+    return NextResponse.json({ 
+      message: 'Server updated successfully',
+      server: {
+        id: server.id,
+        name: server.name,
+        host: server.host,
+        port: server.port,
+      }
+    });
   } catch (error: any) {
+    console.error('Failed to update server:', error);
     return NextResponse.json(
       { error: 'Failed to update server', details: error.message },
       { status: 500 }
@@ -99,9 +108,13 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await runQuery('DELETE FROM servers WHERE id = ?', [params.id]);
+    await prisma.server.delete({
+      where: { id: parseInt(params.id) },
+    });
+
     return NextResponse.json({ message: 'Server deleted successfully' });
   } catch (error: any) {
+    console.error('Failed to delete server:', error);
     return NextResponse.json(
       { error: 'Failed to delete server', details: error.message },
       { status: 500 }

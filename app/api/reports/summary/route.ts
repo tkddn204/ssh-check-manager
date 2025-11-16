@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuery } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 // GET: 전체 통계 요약
 export async function GET(request: NextRequest) {
@@ -7,30 +7,45 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const server_id = searchParams.get('server_id');
 
-    let whereClause = '';
-    const params: any[] = [];
-
+    const where: any = {};
     if (server_id) {
-      whereClause = 'WHERE server_id = ?';
-      params.push(server_id);
+      where.serverId = parseInt(server_id);
     }
 
-    const summary = await getQuery<any>(
-      `SELECT
-        COUNT(*) as total_checks,
-        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
-        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count,
-        SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
-        AVG(execution_time) as avg_execution_time,
-        MIN(checked_at) as first_check,
-        MAX(checked_at) as last_check
-      FROM check_results
-      ${whereClause}`,
-      params
-    );
+    const [totalChecks, successCount, failedCount, errorCount, avgExecutionResult, firstCheck, lastCheck] = await Promise.all([
+      prisma.checkResult.count({ where }),
+      prisma.checkResult.count({ where: { ...where, status: 'success' } }),
+      prisma.checkResult.count({ where: { ...where, status: 'failed' } }),
+      prisma.checkResult.count({ where: { ...where, status: 'error' } }),
+      prisma.checkResult.aggregate({
+        where,
+        _avg: { executionTime: true },
+      }),
+      prisma.checkResult.findFirst({
+        where,
+        orderBy: { checkedAt: 'asc' },
+        select: { checkedAt: true },
+      }),
+      prisma.checkResult.findFirst({
+        where,
+        orderBy: { checkedAt: 'desc' },
+        select: { checkedAt: true },
+      }),
+    ]);
+
+    const summary = {
+      total_checks: totalChecks,
+      success_count: successCount,
+      failed_count: failedCount,
+      error_count: errorCount,
+      avg_execution_time: avgExecutionResult._avg.executionTime || 0,
+      first_check: firstCheck?.checkedAt || null,
+      last_check: lastCheck?.checkedAt || null,
+    };
 
     return NextResponse.json({ summary });
   } catch (error: any) {
+    console.error('Failed to fetch summary:', error);
     return NextResponse.json(
       { error: 'Failed to fetch summary', details: error.message },
       { status: 500 }
