@@ -36,6 +36,7 @@ export default function ChecksPage() {
   const [selectedCommands, setSelectedCommands] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [expandedResultId, setExpandedResultId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -309,27 +310,77 @@ export default function ChecksPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     점검 시각
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    상세
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {results.map((result) => (
-                  <tr key={result.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {result.server_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {result.command_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(result.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {result.execution_time}ms
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(result.checked_at).toLocaleString('ko-KR')}
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={result.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {result.server_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.command_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getStatusBadge(result.status)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.execution_time}ms
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(result.checked_at).toLocaleString('ko-KR')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() =>
+                            setExpandedResultId(
+                              expandedResultId === result.id ? null : result.id
+                            )
+                          }
+                          className="text-primary-600 hover:text-primary-900 font-medium"
+                        >
+                          {expandedResultId === result.id ? '숨기기' : '보기'}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedResultId === result.id && (
+                      <tr key={`${result.id}-detail`}>
+                        <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                          <div className="space-y-3">
+                            {result.output && (
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-900 mb-2">
+                                  실행 결과:
+                                </h4>
+                                <pre className="bg-white p-3 rounded border border-gray-200 text-xs overflow-x-auto">
+                                  {result.output}
+                                </pre>
+                              </div>
+                            )}
+                            {result.error_message && (
+                              <div>
+                                <h4 className="text-sm font-medium text-red-900 mb-2">
+                                  에러 메시지:
+                                </h4>
+                                <pre className="bg-red-50 p-3 rounded border border-red-200 text-xs text-red-900 overflow-x-auto">
+                                  {result.error_message}
+                                </pre>
+                              </div>
+                            )}
+                            {!result.output && !result.error_message && (
+                              <p className="text-sm text-gray-500">
+                                출력 결과가 없습니다.
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
