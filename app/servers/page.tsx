@@ -8,9 +8,9 @@ interface Server {
   host: string;
   port: number;
   username: string;
-  auth_type: 'password' | 'key';
+  authType: 'password' | 'key';
   description?: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export default function ServersPage() {
@@ -22,9 +22,9 @@ export default function ServersPage() {
     host: '',
     port: 22,
     username: '',
-    auth_type: 'password' as 'password' | 'key',
+    authType: 'password' as 'password' | 'key',
     password: '',
-    private_key: '',
+    privateKey: '',
     description: '',
   });
 
@@ -60,9 +60,9 @@ export default function ServersPage() {
           host: '',
           port: 22,
           username: '',
-          auth_type: 'password',
+          authType: 'password',
           password: '',
-          private_key: '',
+          privateKey: '',
           description: '',
         });
         fetchServers();
@@ -171,7 +171,7 @@ export default function ServersPage() {
                         <span className="mx-2">•</span>
                         <span className="flex items-center">
                           <span className="font-semibold mr-2">인증:</span>
-                          {server.auth_type === 'password' ? '비밀번호' : 'SSH 키'}
+                          {server.authType === 'password' ? '비밀번호' : 'SSH 키'}
                         </span>
                       </div>
                       {server.description && (
@@ -282,11 +282,11 @@ export default function ServersPage() {
                         인증 방식
                       </label>
                       <select
-                        value={formData.auth_type}
+                        value={formData.authType}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            auth_type: e.target.value as 'password' | 'key',
+                            authType: e.target.value as 'password' | 'key',
                           })
                         }
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
@@ -296,7 +296,7 @@ export default function ServersPage() {
                       </select>
                     </div>
 
-                    {formData.auth_type === 'password' ? (
+                    {formData.authType === 'password' ? (
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
                           비밀번호 *
@@ -319,11 +319,11 @@ export default function ServersPage() {
                         <textarea
                           required
                           rows={4}
-                          value={formData.private_key}
+                          value={formData.privateKey}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              private_key: e.target.value,
+                              privateKey: e.target.value,
                             })
                           }
                           placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
