@@ -251,7 +251,7 @@ export default function ResultsPage() {
                                 <h4 className="text-sm font-medium text-gray-900 mb-2">
                                   실행 결과:
                                 </h4>
-                                <pre className="bg-white p-3 rounded border border-gray-200 text-xs overflow-x-auto max-h-96">
+                                <pre className="bg-white p-3 rounded border border-gray-200 text-xs overflow-x-auto whitespace-pre-wrap break-words max-h-96">
                                   {result.output}
                                 </pre>
                               </div>
@@ -261,7 +261,7 @@ export default function ResultsPage() {
                                 <h4 className="text-sm font-medium text-red-900 mb-2">
                                   에러 메시지:
                                 </h4>
-                                <pre className="bg-red-50 p-3 rounded border border-red-200 text-xs text-red-900 overflow-x-auto max-h-96">
+                                <pre className="bg-red-50 p-3 rounded border border-red-200 text-xs text-red-900 overflow-x-auto whitespace-pre-wrap break-words max-h-96">
                                   {result.error_message}
                                 </pre>
                               </div>

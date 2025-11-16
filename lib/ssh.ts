@@ -58,17 +58,24 @@ export async function executeSSHCommand(
           conn.end();
           const executionTime = Date.now() - startTime;
 
-          if (code === 0) {
+          // stderr에 출력이 있거나 특정 에러 패턴이 있으면 실패로 판단
+          const hasStderr = errorOutput.trim().length > 0;
+          const hasErrorPattern = /not available|command not found|not installed|no such|error|failed|cannot|permission denied/i.test(
+            output + errorOutput
+          );
+
+          // exit code가 0이 아니거나, stderr가 있거나, 에러 패턴이 있으면 실패
+          if (code !== 0 || hasStderr || hasErrorPattern) {
             resolve({
-              success: true,
-              output: output || errorOutput,
+              success: false,
+              output: output || null,
+              error: errorOutput || (hasErrorPattern ? output : `Command exited with code ${code}`),
               executionTime,
             });
           } else {
             resolve({
-              success: false,
-              output: output,
-              error: errorOutput || `Command exited with code ${code}`,
+              success: true,
+              output: output || errorOutput,
               executionTime,
             });
           }
