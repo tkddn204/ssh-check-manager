@@ -1,5 +1,5 @@
 import { Client, ConnectConfig } from 'ssh2';
-import { Server, SSHTunnel, TunnelType } from './types';
+import { Server, SSHTunnel } from './types';
 import net from 'net';
 
 export interface SSHExecutionResult {
@@ -68,7 +68,7 @@ export async function executeSSHCommand(
           if (code !== 0 || hasStderr || hasErrorPattern) {
             resolve({
               success: false,
-              output: output || null,
+              output: output,
               error: errorOutput || (hasErrorPattern ? output : `Command exited with code ${code}`),
               executionTime,
             });
@@ -228,7 +228,7 @@ export class SSHTunnelManager {
                 stream.end();
               });
 
-              stream.on('error', (err) => {
+              stream.on('error', (err: any) => {
                 console.error('Remote stream error:', err);
                 localSocket.end();
               });
@@ -287,7 +287,7 @@ export class SSHTunnelManager {
 
           remoteSocket.pipe(localSocket).pipe(remoteSocket);
 
-          remoteSocket.on('error', (err) => {
+          remoteSocket.on('error', (err: any) => {
             console.error('Remote socket error:', err);
             localSocket.end();
           });
