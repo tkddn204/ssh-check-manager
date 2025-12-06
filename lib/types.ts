@@ -6,7 +6,8 @@ import {
   AuthType,
   CheckStatus,
   TunnelType,
-  ClientType
+  ClientType,
+  ExecutionLocation
 } from '@prisma/client';
 
 // Prisma 타입 재export
@@ -14,7 +15,8 @@ export type {
   AuthType,
   CheckStatus,
   TunnelType,
-  ClientType
+  ClientType,
+  ExecutionLocation
 };
 
 // 서버 타입

@@ -12,16 +12,18 @@ const nextConfig = {
       };
     }
 
-    // ssh2의 네이티브 모듈(cpu-features)을 외부화
+    // ssh2의 네이티브 모듈을 외부화
     config.externals = config.externals || [];
     config.externals.push({
       'cpu-features': 'commonjs cpu-features',
+      './crypto/build/Release/sshcrypto.node': 'commonjs ./crypto/build/Release/sshcrypto.node',
     });
 
     // 선택적 의존성 무시
     config.resolve.alias = {
       ...config.resolve.alias,
       'cpu-features': false,
+      './crypto/build/Release/sshcrypto.node': false,
     };
 
     return config;

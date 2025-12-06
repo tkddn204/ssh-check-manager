@@ -14,6 +14,7 @@ interface Server {
   requiresClient?: boolean;
   clientType?: 'vpn' | 'web_portal' | 'custom_app' | 'bastion' | 'none';
   clientConfig?: string;
+  executionLocation?: 'server' | 'client';
 }
 
 export default function ServersPage() {
@@ -29,6 +30,7 @@ export default function ServersPage() {
     password: '',
     privateKey: '',
     description: '',
+    executionLocation: 'client' as 'server' | 'client',
     requiresClient: false,
     clientType: 'none' as 'vpn' | 'web_portal' | 'custom_app' | 'bastion' | 'none',
     // VPN 설정
@@ -117,6 +119,7 @@ export default function ServersPage() {
           password: formData.password,
           privateKey: formData.privateKey,
           description: formData.description,
+          executionLocation: formData.executionLocation,
           requiresClient: formData.requiresClient,
           clientType: formData.requiresClient ? formData.clientType : null,
           clientConfig,
@@ -134,6 +137,7 @@ export default function ServersPage() {
           password: '',
           privateKey: '',
           description: '',
+          executionLocation: 'client',
           requiresClient: false,
           clientType: 'none',
           vpnName: '',
@@ -374,23 +378,44 @@ export default function ServersPage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        인증 방식
-                      </label>
-                      <select
-                        value={formData.authType}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            authType: e.target.value as 'password' | 'key',
-                          })
-                        }
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value="password">비밀번호</option>
-                        <option value="key">SSH 키</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          인증 방식
+                        </label>
+                        <select
+                          value={formData.authType}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              authType: e.target.value as 'password' | 'key',
+                            })
+                          }
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        >
+                          <option value="password">비밀번호</option>
+                          <option value="key">SSH 키</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          실행 위치
+                        </label>
+                        <select
+                          value={formData.executionLocation}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              executionLocation: e.target.value as 'server' | 'client',
+                            })
+                          }
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        >
+                          <option value="client">클라이언트에서 SSH 접속</option>
+                          <option value="server">서버에서 직접 실행</option>
+                        </select>
+                      </div>
                     </div>
 
                     {formData.authType === 'password' ? (

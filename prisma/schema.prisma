@@ -26,6 +26,9 @@ model Server {
   clientType     ClientType? @map("client_type")
   clientConfig   String? @db.Text @map("client_config") // JSON 형태로 저장
 
+  // 실행 위치 (서버에서 실행 vs 클라이언트에서 SSH 접속)
+  executionLocation ExecutionLocation @default(client) @map("execution_location")
+
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -115,4 +118,9 @@ enum ClientType {
   custom_app     // 커스텀 애플리케이션 필요
   bastion        // Bastion 호스트 경유 필요
   none           // 요구사항 없음
+}
+
+enum ExecutionLocation {
+  server         // 서버에서 직접 실행 (서버 측 에이전트)
+  client         // 클라이언트(Next.js 서버)에서 SSH 접속하여 실행
 }
