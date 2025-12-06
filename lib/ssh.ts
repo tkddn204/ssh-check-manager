@@ -97,6 +97,91 @@ export async function executeSSHCommand(
   });
 }
 
+// SSH 명령어 실행 (스트리밍 버전 - 실시간 출력 콜백 지원)
+export async function executeSSHCommandStreaming(
+  server: Server,
+  command: string,
+  onOutput?: (data: string) => void,
+  onError?: (data: string) => void
+): Promise<SSHExecutionResult> {
+  const startTime = Date.now();
+
+  return new Promise((resolve) => {
+    const conn = new Client();
+    let output = '';
+    let errorOutput = '';
+
+    const config = createSSHConfig(server);
+
+    conn.on('ready', () => {
+      conn.exec(command, (err, stream) => {
+        if (err) {
+          conn.end();
+          resolve({
+            success: false,
+            error: err.message,
+            executionTime: Date.now() - startTime,
+          });
+          return;
+        }
+
+        stream.on('close', (code: number, signal: string) => {
+          conn.end();
+          const executionTime = Date.now() - startTime;
+
+          // stderr에 출력이 있거나 특정 에러 패턴이 있으면 실패로 판단
+          const hasStderr = errorOutput.trim().length > 0;
+          const hasErrorPattern = /not available|command not found|not installed|no such|error|failed|cannot|permission denied/i.test(
+            output + errorOutput
+          );
+
+          // exit code가 0이 아니거나, stderr가 있거나, 에러 패턴이 있으면 실패
+          if (code !== 0 || hasStderr || hasErrorPattern) {
+            resolve({
+              success: false,
+              output: output || null,
+              error: errorOutput || (hasErrorPattern ? output : `Command exited with code ${code}`),
+              executionTime,
+            });
+          } else {
+            resolve({
+              success: true,
+              output: output || errorOutput,
+              executionTime,
+            });
+          }
+        }).on('data', (data: Buffer) => {
+          const chunk = data.toString('utf8');
+          output += chunk;
+          // 실시간 출력 콜백 호출
+          if (onOutput) {
+            onOutput(chunk);
+          }
+        }).stderr.on('data', (data: Buffer) => {
+          const chunk = data.toString('utf8');
+          errorOutput += chunk;
+          // 실시간 에러 콜백 호출
+          if (onError) {
+            onError(chunk);
+          }
+        });
+      });
+    }).on('error', (err) => {
+      const errorMsg = `SSH Connection Error: ${err.message}`;
+      if (onError) {
+        onError(errorMsg);
+      }
+      resolve({
+        success: false,
+        error: errorMsg,
+        executionTime: Date.now() - startTime,
+      });
+    });
+
+    conn.connect(config);
+  });
+}
+
 // SSH 연결 테스트
 export async function testSSHConnection(server: Server): Promise<boolean> {
   try {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { AuthType, ExecutionLocation } from '@/lib/types';
+import { AuthType } from '@/lib/types';
 
 // GET: 모든 서버 목록 조회
 export async function GET() {
@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
       password,
       privateKey,
       description,
-      executionLocation,
       requiresClient,
       clientType,
       clientConfig
@@ -87,7 +86,7 @@ export async function POST(request: NextRequest) {
         password: authType === 'password' ? password : null,
         privateKey: authType === 'key' ? privateKey : null,
         description,
-        executionLocation: (executionLocation as ExecutionLocation) || 'client',
+        executionLocation: 'client', // All servers use client-side SSH connections
         requiresClient: requiresClient || false,
         clientType: clientType || null,
         clientConfig: clientConfig || null,

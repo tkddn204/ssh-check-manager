@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface Server {
   id: number;
@@ -38,10 +38,25 @@ export default function ChecksPage() {
   const [executing, setExecuting] = useState(false);
   const [expandedResultId, setExpandedResultId] = useState<number | null>(null);
 
+  // Console output states
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
+  const [currentServer, setCurrentServer] = useState<string>('');
+  const [currentCommand, setCurrentCommand] = useState<string>('');
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const consoleEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     fetchData();
     fetchResults();
   }, []);
+
+  // Auto-scroll console to bottom when new output arrives
+  useEffect(() => {
+    if (consoleEndRef.current) {
+      consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [consoleOutput]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -112,8 +127,13 @@ export default function ChecksPage() {
     }
 
     setExecuting(true);
+    setConsoleOpen(true);
+    setConsoleOutput([]);
+    setCurrentServer('');
+    setCurrentCommand('');
+
     try {
-      const res = await fetch('/api/checks/batch', {
+      const res = await fetch('/api/checks/batch-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,16 +142,85 @@ export default function ChecksPage() {
         }),
       });
 
-      if (res.ok) {
-        alert('점검이 완료되었습니다.');
-        fetchResults();
-      } else {
-        const error = await res.json();
-        alert(`점검 실행 실패: ${error.error}`);
+      if (!res.ok) {
+        alert('점검 실행 실패');
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        alert('스트림을 읽을 수 없습니다.');
+        return;
+      }
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          const eventMatch = line.match(/^event: (.+)\ndata: (.+)$/s);
+          if (!eventMatch) continue;
+
+          const [, event, dataStr] = eventMatch;
+          const data = JSON.parse(dataStr);
+
+          switch (event) {
+            case 'start':
+              setProgress({ current: 0, total: data.total_servers * data.total_commands });
+              setConsoleOutput((prev) => [...prev, `📋 점검 시작: ${data.total_servers}개 서버, ${data.total_commands}개 명령어`]);
+              break;
+
+            case 'server_start':
+              setCurrentServer(`${data.server_name} (${data.server_host})`);
+              setConsoleOutput((prev) => [...prev, `\n🖥️  서버: ${data.server_name} (${data.server_host}) [${data.server_index}/${data.total_servers}]`]);
+              break;
+
+            case 'command_start':
+              setCurrentCommand(data.command_name);
+              setConsoleOutput((prev) => [...prev, `\n⚡ 명령어: ${data.command_name} [${data.command_index}/${data.total_commands}]`, `$ ${data.command_text}`]);
+              break;
+
+            case 'output':
+              const prefix = data.type === 'stderr' ? '⚠️ ' : '';
+              setConsoleOutput((prev) => [...prev, prefix + data.data]);
+              break;
+
+            case 'command_complete':
+              const statusIcon = data.status === 'success' ? '✅' : data.status === 'error' ? '❌' : '⚠️';
+              setConsoleOutput((prev) => [...prev, `${statusIcon} 완료: ${data.command_name} (${data.execution_time}ms) - ${data.status}`]);
+              setProgress((prev) => ({ ...prev, current: prev.current + 1 }));
+              break;
+
+            case 'server_complete':
+              setConsoleOutput((prev) => [...prev, `✓ 서버 완료: ${data.server_name}\n`]);
+              break;
+
+            case 'complete':
+              setConsoleOutput((prev) => [...prev, `\n🎉 모든 점검 완료!`]);
+              setCurrentServer('');
+              setCurrentCommand('');
+              fetchResults();
+              break;
+
+            case 'error':
+              setConsoleOutput((prev) => [...prev, `❌ 에러: ${data.message}${data.details ? ` - ${data.details}` : ''}`]);
+              break;
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to execute checks:', error);
-      alert('점검 실행 중 오류가 발생했습니다.');
+      setConsoleOutput((prev) => [...prev, `\n❌ 점검 실행 중 오류 발생: ${error}`]);
     } finally {
       setExecuting(false);
     }
@@ -273,6 +362,77 @@ export default function ChecksPage() {
           {executing ? '실행 중...' : '점검 실행'}
         </button>
       </div>
+
+      {/* 실행 콘솔 */}
+      {consoleOpen && (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="flex justify-between items-center px-6 py-4 bg-gray-800 text-white">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-medium">실행 콘솔</h2>
+              {executing && (
+                <div className="flex items-center space-x-2 text-sm">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>실행 중...</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setConsoleOpen(false)}
+              className="text-gray-300 hover:text-white"
+            >
+              닫기
+            </button>
+          </div>
+
+          {/* Progress bar */}
+          {progress.total > 0 && (
+            <div className="px-6 py-2 bg-gray-100">
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <span>진행률: {progress.current} / {progress.total}</span>
+                <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {/* Current status */}
+          {(currentServer || currentCommand) && (
+            <div className="px-6 py-3 bg-gray-50 border-b text-sm">
+              {currentServer && (
+                <div className="text-gray-700">
+                  <span className="font-medium">현재 서버:</span> {currentServer}
+                </div>
+              )}
+              {currentCommand && (
+                <div className="text-gray-700">
+                  <span className="font-medium">현재 명령어:</span> {currentCommand}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Console output */}
+          <div className="p-6 bg-black text-green-400 font-mono text-sm max-h-96 overflow-y-auto">
+            {consoleOutput.length === 0 ? (
+              <div className="text-gray-500">콘솔 출력 대기 중...</div>
+            ) : (
+              <div className="space-y-0.5">
+                {consoleOutput.map((line, index) => (
+                  <div key={index} className="whitespace-pre-wrap break-words">
+                    {line}
+                  </div>
+                ))}
+                <div ref={consoleEndRef} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 최근 점검 결과 */}
       <div className="bg-white shadow rounded-lg p-6">
