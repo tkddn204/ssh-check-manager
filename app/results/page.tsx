@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { serversApi, checksApi } from '@/lib/api';
 
 interface Server {
   id: number;
@@ -34,8 +35,7 @@ export default function ResultsPage() {
 
   const fetchServers = async () => {
     try {
-      const res = await fetch('/api/servers');
-      const data = await res.json();
+      const data = await serversApi.getAll();
       setServers(data.servers || []);
     } catch (error) {
       console.error('Failed to fetch servers:', error);
@@ -45,13 +45,11 @@ export default function ResultsPage() {
   const fetchResults = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.append('limit', limit.toString());
-      if (filterServerId) params.append('server_id', filterServerId);
-      if (filterStatus) params.append('status', filterStatus);
-
-      const res = await fetch(`/api/checks/results?${params}`);
-      const data = await res.json();
+      const data = await checksApi.getResults({
+        limit,
+        server_id: filterServerId || undefined,
+        status: filterStatus || undefined,
+      });
       setResults(data.results || []);
     } catch (error) {
       console.error('Failed to fetch results:', error);

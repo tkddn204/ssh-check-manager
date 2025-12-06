@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { serversApi, commandsApi, checksApi } from '@/lib/api';
 
 interface Server {
   id: number;
@@ -61,13 +62,10 @@ export default function ChecksPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [serversRes, commandsRes] = await Promise.all([
-        fetch('/api/servers'),
-        fetch('/api/commands'),
+      const [serversData, commandsData] = await Promise.all([
+        serversApi.getAll(),
+        commandsApi.getAll(),
       ]);
-
-      const serversData = await serversRes.json();
-      const commandsData = await commandsRes.json();
 
       setServers(serversData.servers || []);
       setCommands(commandsData.commands || []);
@@ -80,8 +78,7 @@ export default function ChecksPage() {
 
   const fetchResults = async () => {
     try {
-      const res = await fetch('/api/checks/results?limit=10');
-      const data = await res.json();
+      const data = await checksApi.getResults({ limit: 10 });
       setResults(data.results || []);
     } catch (error) {
       console.error('Failed to fetch results:', error);
@@ -133,13 +130,9 @@ export default function ChecksPage() {
     setCurrentCommand('');
 
     try {
-      const res = await fetch('/api/checks/batch-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          server_ids: selectedServers,
-          command_ids: selectedCommands,
-        }),
+      const res = await checksApi.executeBatchStream({
+        server_ids: selectedServers,
+        command_ids: selectedCommands,
       });
 
       if (!res.ok) {
@@ -168,7 +161,7 @@ export default function ChecksPage() {
         for (const line of lines) {
           if (!line.trim()) continue;
 
-          const eventMatch = line.match(/^event: (.+)\ndata: (.+)$/s);
+          const eventMatch = line.match(/^event: (.+)\ndata: (.+)$/);
           if (!eventMatch) continue;
 
           const [, event, dataStr] = eventMatch;

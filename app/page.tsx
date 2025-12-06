@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, startOfWeek, endOfWeek, getDay } from 'date-fns';
-import { ko } from 'date-fns/locale';
+import { dashboardApi } from '@/lib/api';
 
 interface ServerMonthlyStatus {
   serverId: number;
@@ -70,9 +70,7 @@ export default function Dashboard() {
       const year = selectedMonth.getFullYear();
       const month = selectedMonth.getMonth() + 1;
 
-      const response = await fetch(`/api/dashboard/monthly-status?year=${year}&month=${month}`);
-      const result = await response.json();
-
+      const result = await dashboardApi.getMonthlyStatus(year, month);
       setData(result);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -82,10 +80,9 @@ export default function Dashboard() {
   };
 
   const fetchDailyResults = async (date: string) => {
-    setLoadingDailyResults(true);
     try {
-      const response = await fetch(`/api/dashboard/daily-results?date=${date}`);
-      const result = await response.json();
+      setLoadingDailyResults(true);
+      const result = await dashboardApi.getDailyResults(date);
       setDailyResults(result);
     } catch (error) {
       console.error('Failed to fetch daily results:', error);

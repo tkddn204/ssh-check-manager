@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { commandsApi, initApi } from '@/lib/api';
 
 interface Command {
   id: number;
@@ -28,8 +29,7 @@ export default function CommandsPage() {
 
   const fetchCommands = async () => {
     try {
-      const res = await fetch('/api/commands');
-      const data = await res.json();
+      const data = await commandsApi.getAll();
       setCommands(data.commands || []);
     } catch (error) {
       console.error('Failed to fetch commands:', error);
@@ -41,33 +41,23 @@ export default function CommandsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingCommand
-        ? `/api/commands/${editingCommand.id}`
-        : '/api/commands';
-      const method = editingCommand ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        setShowModal(false);
-        setEditingCommand(null);
-        setFormData({
-          name: '',
-          command: '',
-          description: '',
-        });
-        fetchCommands();
+      if (editingCommand) {
+        await commandsApi.update(editingCommand.id, formData);
       } else {
-        const error = await res.json();
-        alert(`명령어 ${editingCommand ? '수정' : '추가'} 실패: ${error.error}`);
+        await commandsApi.create(formData);
       }
-    } catch (error) {
+
+      setShowModal(false);
+      setEditingCommand(null);
+      setFormData({
+        name: '',
+        command: '',
+        description: '',
+      });
+      fetchCommands();
+    } catch (error: any) {
       console.error('Failed to save command:', error);
-      alert('명령어 저장 중 오류가 발생했습니다.');
+      alert(`명령어 ${editingCommand ? '수정' : '추가'} 실패: ${error.message}`);
     }
   };
 
@@ -85,17 +75,11 @@ export default function CommandsPage() {
     if (!confirm('정말 이 명령어를 삭제하시겠습니까?')) return;
 
     try {
-      const res = await fetch(`/api/commands/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        fetchCommands();
-      } else {
-        alert('명령어 삭제 실패');
-      }
-    } catch (error) {
+      await commandsApi.delete(id);
+      fetchCommands();
+    } catch (error: any) {
       console.error('Failed to delete command:', error);
+      alert(`명령어 삭제 실패: ${error.message}`);
     }
   };
 
@@ -114,20 +98,12 @@ export default function CommandsPage() {
 
     setInitializing(true);
     try {
-      const res = await fetch('/api/init', {
-        method: 'POST',
-      });
-
-      if (res.ok) {
-        alert('기본 명령어가 추가되었습니다.');
-        fetchCommands();
-      } else {
-        const error = await res.json();
-        alert(`초기화 실패: ${error.error}`);
-      }
-    } catch (error) {
+      await initApi.initialize();
+      alert('기본 명령어가 추가되었습니다.');
+      fetchCommands();
+    } catch (error: any) {
       console.error('Failed to initialize:', error);
-      alert('초기화 중 오류가 발생했습니다.');
+      alert(`초기화 실패: ${error.message}`);
     } finally {
       setInitializing(false);
     }

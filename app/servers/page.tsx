@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { serversApi, vpnApi } from '@/lib/api';
+
+interface VpnProfile {
+  id: number;
+  name: string;
+  process_name: string;
+}
 
 interface Server {
   id: number;
@@ -11,6 +18,8 @@ interface Server {
   authType: 'password' | 'key';
   description?: string;
   createdAt: string;
+  vpnProfileId?: number;
+  vpnProfile?: VpnProfile;
   requiresClient?: boolean;
   clientType?: 'vpn' | 'web_portal' | 'custom_app' | 'bastion' | 'none';
   clientConfig?: string;
@@ -18,6 +27,7 @@ interface Server {
 
 export default function ServersPage() {
   const [servers, setServers] = useState<Server[]>([]);
+  const [vpnProfiles, setVpnProfiles] = useState<VpnProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -29,9 +39,10 @@ export default function ServersPage() {
     password: '',
     privateKey: '',
     description: '',
+    vpnProfileId: null as number | null,
     requiresClient: false,
     clientType: 'none' as 'vpn' | 'web_portal' | 'custom_app' | 'bastion' | 'none',
-    // VPN 설정
+    // VPN 설정 (deprecated - VPN 프로필로 대체)
     vpnName: '',
     vpnExecutablePath: '',
     vpnConfigPath: '',
@@ -52,17 +63,26 @@ export default function ServersPage() {
 
   useEffect(() => {
     fetchServers();
+    fetchVpnProfiles();
   }, []);
 
   const fetchServers = async () => {
     try {
-      const res = await fetch('/api/servers');
-      const data = await res.json();
+      const data = await serversApi.getAll();
       setServers(data.servers || []);
     } catch (error) {
       console.error('Failed to fetch servers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchVpnProfiles = async () => {
+    try {
+      const data = await vpnApi.getAll();
+      setVpnProfiles(data.vpn_profiles || []);
+    } catch (error) {
+      console.error('Failed to fetch VPN profiles:', error);
     }
   };
 
@@ -105,59 +125,51 @@ export default function ServersPage() {
         }
       }
 
-      const res = await fetch('/api/servers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          host: formData.host,
-          port: formData.port,
-          username: formData.username,
-          authType: formData.authType,
-          password: formData.password,
-          privateKey: formData.privateKey,
-          description: formData.description,
-          requiresClient: formData.requiresClient,
-          clientType: formData.requiresClient ? formData.clientType : null,
-          clientConfig,
-        }),
+      await serversApi.create({
+        name: formData.name,
+        host: formData.host,
+        port: formData.port,
+        username: formData.username,
+        authType: formData.authType,
+        password: formData.password,
+        privateKey: formData.privateKey,
+        description: formData.description,
+        requiresClient: formData.requiresClient,
+        clientType: formData.requiresClient ? formData.clientType : null,
+        clientConfig,
       });
 
-      if (res.ok) {
-        setShowModal(false);
-        setFormData({
-          name: '',
-          host: '',
-          port: 22,
-          username: '',
-          authType: 'password',
-          password: '',
-          privateKey: '',
-          description: '',
-          requiresClient: false,
-          clientType: 'none',
-          vpnName: '',
-          vpnExecutablePath: '',
-          vpnConfigPath: '',
-          webPortalUrl: '',
-          webPortalInstructions: '',
-          customAppPath: '',
-          customAppArgs: '',
-          bastionHost: '',
-          bastionPort: 22,
-          bastionUsername: '',
-          bastionAuthType: 'password',
-          bastionPassword: '',
-          bastionPrivateKey: '',
-        });
-        fetchServers();
-      } else {
-        const error = await res.json();
-        alert(`서버 추가 실패: ${error.error}`);
-      }
-    } catch (error) {
+      setShowModal(false);
+      setFormData({
+        name: '',
+        host: '',
+        port: 22,
+        username: '',
+        authType: 'password',
+        password: '',
+        privateKey: '',
+        description: '',
+        requiresClient: false,
+        clientType: 'none',
+        vpnProfileId: null,
+        vpnName: '',
+        vpnExecutablePath: '',
+        vpnConfigPath: '',
+        webPortalUrl: '',
+        webPortalInstructions: '',
+        customAppPath: '',
+        customAppArgs: '',
+        bastionHost: '',
+        bastionPort: 22,
+        bastionUsername: '',
+        bastionAuthType: 'password',
+        bastionPassword: '',
+        bastionPrivateKey: '',
+      });
+      fetchServers();
+    } catch (error: any) {
       console.error('Failed to add server:', error);
-      alert('서버 추가 중 오류가 발생했습니다.');
+      alert(`서버 추가 실패: ${error.message}`);
     }
   };
 
@@ -165,17 +177,11 @@ export default function ServersPage() {
     if (!confirm('정말 이 서버를 삭제하시겠습니까?')) return;
 
     try {
-      const res = await fetch(`/api/servers/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        fetchServers();
-      } else {
-        alert('서버 삭제 실패');
-      }
-    } catch (error) {
+      await serversApi.delete(id);
+      fetchServers();
+    } catch (error: any) {
       console.error('Failed to delete server:', error);
+      alert(`서버 삭제 실패: ${error.message}`);
     }
   };
 

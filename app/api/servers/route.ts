@@ -21,6 +21,14 @@ export async function GET() {
         requiresClient: true,
         clientType: true,
         clientConfig: true,
+        vpnProfileId: true,
+        vpnProfile: {
+          select: {
+            id: true,
+            name: true,
+            processName: true,
+          },
+        },
         createdAt: true,
         updatedAt: true,
       },
@@ -49,6 +57,7 @@ export async function POST(request: NextRequest) {
       password,
       privateKey,
       description,
+      vpnProfileId,
       requiresClient,
       clientType,
       clientConfig
@@ -86,6 +95,7 @@ export async function POST(request: NextRequest) {
         password: authType === 'password' ? password : null,
         privateKey: authType === 'key' ? privateKey : null,
         description,
+        vpnProfileId: vpnProfileId || null,
         executionLocation: 'client', // All servers use client-side SSH connections
         requiresClient: requiresClient || false,
         clientType: clientType || null,

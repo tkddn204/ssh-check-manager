@@ -9,6 +9,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// VPN 프로필
+model VpnProfile {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(255)
+  processName     String   @map("process_name") @db.VarChar(255) // 폴링할 프로세스 이름 (예: openvpn.exe)
+  description     String?  @db.Text
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  servers         Server[]
+
+  @@map("vpn_profiles")
+}
+
 // 서버 정보
 model Server {
   id          Int      @id @default(autoincrement())
@@ -20,6 +35,10 @@ model Server {
   password    String?  @db.Text
   privateKey  String?  @map("private_key") @db.Text
   description String?  @db.Text
+
+  // VPN 연결 (선택 사항)
+  vpnProfileId Int?      @map("vpn_profile_id")
+  vpnProfile   VpnProfile? @relation(fields: [vpnProfileId], references: [id], onDelete: SetNull)
 
   // 클라이언트 요구사항 (VPN, 특별 프로그램 등)
   requiresClient Boolean @default(false) @map("requires_client")
@@ -36,6 +55,7 @@ model Server {
   tunnels      SSHTunnel[]
 
   @@map("servers")
+  @@index([vpnProfileId])
 }
 
 // SSH 터널링 설정
