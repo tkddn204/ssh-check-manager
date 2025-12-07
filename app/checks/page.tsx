@@ -44,7 +44,7 @@ export default function ChecksPage() {
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [currentServer, setCurrentServer] = useState<string>('');
   const [currentCommand, setCurrentCommand] = useState<string>('');
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [progress, setProgress] = useState({ current: 0, total: 0, percent: 0 });
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -169,8 +169,8 @@ export default function ChecksPage() {
 
           switch (event) {
             case 'start':
-              setProgress({ current: 0, total: data.total_servers * data.total_commands });
-              setConsoleOutput((prev) => [...prev, `📋 점검 시작: ${data.total_servers}개 서버, ${data.total_commands}개 명령어`]);
+              setProgress({ current: 0, total: data.total_tasks || data.total_servers * data.total_commands, percent: 0 });
+              setConsoleOutput((prev) => [...prev, `📋 점검 시작: ${data.total_servers}개 서버, ${data.total_commands}개 명령어 (총 ${data.total_tasks}개 작업)`]);
               break;
 
             case 'server_start':
@@ -191,7 +191,11 @@ export default function ChecksPage() {
             case 'command_complete':
               const statusIcon = data.status === 'success' ? '✅' : data.status === 'error' ? '❌' : '⚠️';
               setConsoleOutput((prev) => [...prev, `${statusIcon} 완료: ${data.command_name} (${data.execution_time}ms) - ${data.status}`]);
-              setProgress((prev) => ({ ...prev, current: prev.current + 1 }));
+              setProgress({
+                current: data.completed_tasks,
+                total: data.total_tasks,
+                percent: data.progress
+              });
               break;
 
             case 'server_complete':
@@ -199,7 +203,12 @@ export default function ChecksPage() {
               break;
 
             case 'complete':
-              setConsoleOutput((prev) => [...prev, `\n🎉 모든 점검 완료!`]);
+              setConsoleOutput((prev) => [...prev, `\n🎉 모든 점검 완료! (총 ${data.completed_tasks}/${data.total_tasks} 작업)`]);
+              setProgress({
+                current: data.completed_tasks,
+                total: data.total_tasks,
+                percent: 100
+              });
               setCurrentServer('');
               setCurrentCommand('');
               fetchResults();
@@ -379,33 +388,49 @@ export default function ChecksPage() {
 
           {/* Progress bar */}
           {progress.total > 0 && (
-            <div className="px-6 py-2 bg-gray-100">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>진행률: {progress.current} / {progress.total}</span>
-                <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+              <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                <span>진행률: {progress.current} / {progress.total} 작업</span>
+                <span className="text-lg font-bold text-primary-600">{progress.percent}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
                 <div
-                  className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
-                ></div>
+                  className="bg-gradient-to-r from-primary-500 to-primary-600 h-3 rounded-full transition-all duration-500 ease-out shadow-md"
+                  style={{ width: `${progress.percent}%` }}
+                >
+                  {progress.percent > 10 && (
+                    <div className="h-full flex items-center justify-end pr-2">
+                      <span className="text-xs font-bold text-white drop-shadow">{progress.percent}%</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {/* Current status */}
           {(currentServer || currentCommand) && (
-            <div className="px-6 py-3 bg-gray-50 border-b text-sm">
-              {currentServer && (
-                <div className="text-gray-700">
-                  <span className="font-medium">현재 서버:</span> {currentServer}
-                </div>
-              )}
-              {currentCommand && (
-                <div className="text-gray-700">
-                  <span className="font-medium">현재 명령어:</span> {currentCommand}
-                </div>
-              )}
+            <div className="px-6 py-4 bg-white border-b border-gray-200">
+              <div className="space-y-2">
+                {currentServer && (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">현재 서버</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">{currentServer}</span>
+                  </div>
+                )}
+                {currentCommand && (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">현재 명령어</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">{currentCommand}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

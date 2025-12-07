@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { AuthType } from '@/lib/types';
+import { encrypt } from '@/lib/crypto';
 
 // GET: 모든 서버 목록 조회
 export async function GET() {
@@ -9,19 +10,15 @@ export async function GET() {
       orderBy: {
         createdAt: 'desc',
       },
-      select: {
-        id: true,
-        name: true,
-        host: true,
-        port: true,
-        username: true,
-        authType: true,
-        description: true,
-        executionLocation: true,
-        requiresClient: true,
-        clientType: true,
-        clientConfig: true,
-        vpnProfileId: true,
+      include: {
+        credential: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            authType: true,
+          },
+        },
         vpnProfile: {
           select: {
             id: true,
@@ -29,12 +26,32 @@ export async function GET() {
             processName: true,
           },
         },
-        createdAt: true,
-        updatedAt: true,
       },
     });
 
-    return NextResponse.json({ servers });
+    // Flatten credential fields for backward compatibility
+    const formattedServers = servers.map(server => ({
+      id: server.id,
+      name: server.name,
+      host: server.host,
+      port: server.port,
+      description: server.description,
+      executionLocation: server.executionLocation,
+      requiresClient: server.requiresClient,
+      clientType: server.clientType,
+      clientConfig: server.clientConfig,
+      vpnProfileId: server.vpnProfileId,
+      vpnProfile: server.vpnProfile,
+      createdAt: server.createdAt,
+      updatedAt: server.updatedAt,
+      // Credential fields
+      credentialId: server.credentialId,
+      credential: server.credential,
+      username: server.credential?.username,
+      authType: server.credential?.authType,
+    }));
+
+    return NextResponse.json({ servers: formattedServers });
   } catch (error: any) {
     console.error('Failed to fetch servers:', error);
     return NextResponse.json(
@@ -52,10 +69,13 @@ export async function POST(request: NextRequest) {
       name,
       host,
       port,
+      credentialId,
+      // Legacy fields for creating credential on the fly
       username,
       authType,
       password,
       privateKey,
+      credentialName,
       description,
       vpnProfileId,
       requiresClient,
@@ -64,23 +84,48 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // 유효성 검사
-    if (!name || !host || !username || !authType) {
+    if (!name || !host) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, host, username, authType' },
+        { error: 'Missing required fields: name, host' },
         { status: 400 }
       );
     }
 
-    if (authType === 'password' && !password) {
-      return NextResponse.json(
-        { error: 'Password is required for password authentication' },
-        { status: 400 }
-      );
+    let finalCredentialId = credentialId;
+
+    // credentialId가 없으면 credential 정보로 새로 생성
+    if (!finalCredentialId && username && authType) {
+      if (authType === 'password' && !password) {
+        return NextResponse.json(
+          { error: 'Password is required for password authentication' },
+          { status: 400 }
+        );
+      }
+
+      if (authType === 'key' && !privateKey) {
+        return NextResponse.json(
+          { error: 'Private key is required for key authentication' },
+          { status: 400 }
+        );
+      }
+
+      // Credential 생성
+      const credential = await prisma.credential.create({
+        data: {
+          name: credentialName || `${name} - ${username}`,
+          username,
+          authType: authType as AuthType,
+          password: authType === 'password' && password ? encrypt(password) : null,
+          privateKey: authType === 'key' ? privateKey : null,
+        },
+      });
+
+      finalCredentialId = credential.id;
     }
 
-    if (authType === 'key' && !privateKey) {
+    if (!finalCredentialId) {
       return NextResponse.json(
-        { error: 'Private key is required for key authentication' },
+        { error: 'Either credentialId or credential information (username, authType) is required' },
         { status: 400 }
       );
     }
@@ -90,10 +135,7 @@ export async function POST(request: NextRequest) {
         name,
         host,
         port: port || 22,
-        username,
-        authType: authType as AuthType,
-        password: authType === 'password' ? password : null,
-        privateKey: authType === 'key' ? privateKey : null,
+        credentialId: finalCredentialId,
         description,
         vpnProfileId: vpnProfileId || null,
         executionLocation: 'client', // All servers use client-side SSH connections

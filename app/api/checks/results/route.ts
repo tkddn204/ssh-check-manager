@@ -74,3 +74,80 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+// POST: 점검 결과 수동 생성
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { server_id, command_id, output, status, error_message, execution_time } = body;
+
+    if (!server_id || !command_id || !status) {
+      return NextResponse.json(
+        { error: 'server_id, command_id, and status are required' },
+        { status: 400 }
+      );
+    }
+
+    // 서버와 명령어 존재 확인
+    const [server, command] = await Promise.all([
+      prisma.server.findUnique({ where: { id: parseInt(server_id) } }),
+      prisma.checkCommand.findUnique({ where: { id: parseInt(command_id) } }),
+    ]);
+
+    if (!server) {
+      return NextResponse.json({ error: 'Server not found' }, { status: 404 });
+    }
+
+    if (!command) {
+      return NextResponse.json({ error: 'Command not found' }, { status: 404 });
+    }
+
+    const result = await prisma.checkResult.create({
+      data: {
+        serverId: parseInt(server_id),
+        commandId: parseInt(command_id),
+        output: output || null,
+        status: status as CheckStatus,
+        errorMessage: error_message || null,
+        executionTime: execution_time || 0,
+      },
+      include: {
+        server: {
+          select: {
+            id: true,
+            name: true,
+            host: true,
+          },
+        },
+        command: {
+          select: {
+            id: true,
+            name: true,
+            command: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      result: {
+        id: result.id,
+        server_id: result.serverId,
+        server_name: result.server.name,
+        command_id: result.commandId,
+        command_name: result.command.name,
+        status: result.status,
+        output: result.output,
+        error_message: result.errorMessage,
+        execution_time: result.executionTime,
+        checked_at: result.checkedAt,
+      },
+    });
+  } catch (error: any) {
+    console.error('Failed to create check result:', error);
+    return NextResponse.json(
+      { error: 'Failed to create check result', details: error.message },
+      { status: 500 }
+    );
+  }
+}

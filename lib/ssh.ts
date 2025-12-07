@@ -1,5 +1,7 @@
 import { Client, ConnectConfig } from 'ssh2';
 import { Server, SSHTunnel } from './types';
+import { Credential } from '@prisma/client';
+import { decrypt } from './crypto';
 import net from 'net';
 
 export interface SSHExecutionResult {
@@ -10,19 +12,26 @@ export interface SSHExecutionResult {
 }
 
 // SSH 연결 설정 생성
-function createSSHConfig(server: Server): ConnectConfig {
+function createSSHConfig(server: Server & { credential?: Credential | null }): ConnectConfig {
+  const credential = server.credential;
+
+  if (!credential) {
+    throw new Error('Server must have credential information');
+  }
+
   const config: ConnectConfig = {
     host: server.host,
     port: server.port || 22,
-    username: server.username,
+    username: credential.username,
     readyTimeout: 30000,
   };
 
   // 인증 방식 설정
-  if (server.authType === 'password' && server.password) {
-    config.password = server.password;
-  } else if (server.authType === 'key' && server.privateKey) {
-    config.privateKey = server.privateKey;
+  if (credential.authType === 'password' && credential.password) {
+    // 암호화된 password 복호화
+    config.password = decrypt(credential.password);
+  } else if (credential.authType === 'key' && credential.privateKey) {
+    config.privateKey = credential.privateKey;
   }
 
   return config;
@@ -30,7 +39,7 @@ function createSSHConfig(server: Server): ConnectConfig {
 
 // SSH 명령어 실행
 export async function executeSSHCommand(
-  server: Server,
+  server: Server & { credential?: Credential | null },
   command: string
 ): Promise<SSHExecutionResult> {
   const startTime = Date.now();
@@ -99,7 +108,7 @@ export async function executeSSHCommand(
 
 // SSH 명령어 실행 (스트리밍 버전 - 실시간 출력 콜백 지원)
 export async function executeSSHCommandStreaming(
-  server: Server,
+  server: Server & { credential?: Credential | null },
   command: string,
   onOutput?: (data: string) => void,
   onError?: (data: string) => void

@@ -80,6 +80,22 @@ export const checksApi = {
     if (params?.status) searchParams.append('status', params.status);
     return get<{ results: any[] }>(`/api/checks/results${searchParams.toString() ? `?${searchParams}` : ''}`);
   },
+  getResult: (id: number) => get<{ result: any }>(`/api/checks/results/${id}`),
+  createResult: (data: {
+    server_id: number;
+    command_id: number;
+    output?: string;
+    status: string;
+    error_message?: string;
+    execution_time?: number;
+  }) => post<{ result: any }>('/api/checks/results', data),
+  updateResult: (id: number, data: {
+    output?: string;
+    status?: string;
+    error_message?: string;
+    execution_time?: number;
+  }) => put<{ result: any }>(`/api/checks/results/${id}`, data),
+  deleteResult: (id: number) => del<{ message: string }>(`/api/checks/results/${id}`),
   executeBatch: (data: { server_ids: number[]; command_ids: number[] }) =>
     post('/api/checks/batch', data),
   // Stream은 별도 처리 필요 (fetch를 직접 사용)
@@ -123,4 +139,13 @@ export const reportsApi = {
 // 결과 API
 export const resultsApi = {
   getAll: () => get<{ results: any[] }>('/api/results'),
+};
+
+// 인증 정보 API
+export const credentialsApi = {
+  getAll: () => get<{ credentials: any[] }>('/api/credentials'),
+  get: (id: number) => get<{ credential: any }>(`/api/credentials/${id}`),
+  create: (data: any) => post('/api/credentials', data),
+  update: (id: number, data: any) => put(`/api/credentials/${id}`, data),
+  delete: (id: number) => del(`/api/credentials/${id}`),
 };

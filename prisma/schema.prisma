@@ -9,71 +9,94 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// VPN 프로필
-model VpnProfile {
-  id              Int      @id @default(autoincrement())
-  name            String   @db.VarChar(255)
-  processName     String   @map("process_name") @db.VarChar(255) // 폴링할 프로세스 이름 (예: openvpn.exe)
-  description     String?  @db.Text
-
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  servers         Server[]
-
-  @@map("vpn_profiles")
-}
-
-// 서버 정보
-model Server {
+// 인증 정보 (Credential)
+model Credential {
   id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(255)
-  host        String   @db.VarChar(255)
-  port        Int      @default(22)
+  name        String   @db.VarChar(255) // 인증 정보 이름 (예: "운영서버 계정", "개발서버 계정")
   username    String   @db.VarChar(255)
   authType    AuthType @map("auth_type")
   password    String?  @db.Text
   privateKey  String?  @map("private_key") @db.Text
   description String?  @db.Text
 
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  servers Server[]
+
+  @@map("credentials")
+}
+
+// VPN 프로필
+model VpnProfile {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(255)
+  processName String  @map("process_name") @db.VarChar(255) // 폴링할 프로세스 이름 (예: openvpn.exe)
+  description String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  servers Server[]
+
+  @@map("vpn_profiles")
+}
+
+// 서버 정보
+model Server {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(255)
+  host        String  @db.VarChar(255)
+  port        Int     @default(22)
+  description String? @db.Text
+
+  // DB 로그 체크 경로
+  dbBackupLogPath  String? @db.Text
+  dbGeneralLogPath String? @db.Text
+
+  // 인증 정보 참조
+  credentialId Int?        @map("credential_id")
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
   // VPN 연결 (선택 사항)
-  vpnProfileId Int?      @map("vpn_profile_id")
+  vpnProfileId Int?        @map("vpn_profile_id")
   vpnProfile   VpnProfile? @relation(fields: [vpnProfileId], references: [id], onDelete: SetNull)
 
   // 클라이언트 요구사항 (VPN, 특별 프로그램 등)
-  requiresClient Boolean @default(false) @map("requires_client")
+  requiresClient Boolean     @default(false) @map("requires_client")
   clientType     ClientType? @map("client_type")
-  clientConfig   String? @db.Text @map("client_config") // JSON 형태로 저장
+  clientConfig   String?     @db.Text @map("client_config") // JSON 형태로 저장
 
   // 실행 위치 (서버에서 실행 vs 클라이언트에서 SSH 접속)
   executionLocation ExecutionLocation @default(client) @map("execution_location")
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
 
   checkResults CheckResult[]
   tunnels      SSHTunnel[]
 
   @@map("servers")
+  @@index([credentialId])
   @@index([vpnProfileId])
 }
 
 // SSH 터널링 설정
 model SSHTunnel {
-  id          Int      @id @default(autoincrement())
-  serverId    Int      @map("server_id")
-  name        String   @db.VarChar(255)
-  localPort   Int      @map("local_port")
-  remoteHost  String   @map("remote_host") @db.VarChar(255)
-  remotePort  Int      @map("remote_port")
+  id          Int        @id @default(autoincrement())
+  serverId    Int        @map("server_id")
+  name        String     @db.VarChar(255)
+  localPort   Int        @map("local_port")
+  remoteHost  String     @map("remote_host") @db.VarChar(255)
+  remotePort  Int        @map("remote_port")
   tunnelType  TunnelType @map("tunnel_type")
-  isActive    Boolean  @default(false) @map("is_active")
-  description String?  @db.Text
+  isActive    Boolean    @default(false) @map("is_active")
+  description String?    @db.Text
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
 
-  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
 
   @@map("ssh_tunnels")
   @@index([serverId])
@@ -81,12 +104,12 @@ model SSHTunnel {
 
 // 점검 명령어
 model CheckCommand {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(255)
-  command     String   @db.Text
-  description String?  @db.Text
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(255)
+  command     String  @db.Text
+  description String? @db.Text
 
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   checkResults CheckResult[]
 
@@ -95,18 +118,18 @@ model CheckCommand {
 
 // 점검 결과 (서버 접속 기록)
 model CheckResult {
-  id             Int      @id @default(autoincrement())
-  serverId       Int      @map("server_id")
-  commandId      Int      @map("command_id")
-  output         String?  @db.Text
-  status         CheckStatus
-  errorMessage   String?  @map("error_message") @db.Text
-  executionTime  Int      @map("execution_time") // milliseconds
+  id            Int         @id @default(autoincrement())
+  serverId      Int         @map("server_id")
+  commandId     Int         @map("command_id")
+  output        String?     @db.Text
+  status        CheckStatus
+  errorMessage  String?     @map("error_message") @db.Text
+  executionTime Int         @map("execution_time") // milliseconds
 
-  checkedAt      DateTime @default(now()) @map("checked_at")
+  checkedAt DateTime @default(now()) @map("checked_at")
 
-  server         Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  command        CheckCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  server  Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  command CheckCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
 
   @@map("check_results")
   @@index([serverId])
@@ -127,20 +150,20 @@ enum CheckStatus {
 }
 
 enum TunnelType {
-  local    // -L: Local port forwarding
-  remote   // -R: Remote port forwarding
-  dynamic  // -D: Dynamic port forwarding (SOCKS proxy)
+  local // -L: Local port forwarding
+  remote // -R: Remote port forwarding
+  dynamic // -D: Dynamic port forwarding (SOCKS proxy)
 }
 
 enum ClientType {
-  vpn            // VPN 프로그램 필요
-  web_portal     // 웹 포털 접속 필요
-  custom_app     // 커스텀 애플리케이션 필요
-  bastion        // Bastion 호스트 경유 필요
-  none           // 요구사항 없음
+  vpn // VPN 프로그램 필요
+  web_portal // 웹 포털 접속 필요
+  custom_app // 커스텀 애플리케이션 필요
+  bastion // Bastion 호스트 경유 필요
+  none // 요구사항 없음
 }
 
 enum ExecutionLocation {
-  server         // 서버에서 직접 실행 (서버 측 에이전트)
-  client         // 클라이언트(Next.js 서버)에서 SSH 접속하여 실행
+  server // 서버에서 직접 실행 (서버 측 에이전트)
+  client // 클라이언트(Next.js 서버)에서 SSH 접속하여 실행
 }

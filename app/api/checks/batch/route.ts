@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
     for (const server_id of server_ids) {
       const server = await prisma.server.findUnique({
         where: { id: parseInt(server_id) },
+        include: {
+          credential: true,
+        },
       });
 
       if (!server) {

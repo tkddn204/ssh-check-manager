@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { serversApi, vpnApi } from '@/lib/api';
+import { serversApi, vpnApi, credentialsApi } from '@/lib/api';
 
 interface VpnProfile {
   id: number;
@@ -9,13 +9,22 @@ interface VpnProfile {
   process_name: string;
 }
 
+interface Credential {
+  id: number;
+  name: string;
+  username: string;
+  auth_type: 'password' | 'key';
+}
+
 interface Server {
   id: number;
   name: string;
   host: string;
   port: number;
-  username: string;
-  authType: 'password' | 'key';
+  username?: string;
+  authType?: 'password' | 'key';
+  credentialId?: number;
+  credential?: Credential;
   description?: string;
   createdAt: string;
   vpnProfileId?: number;
@@ -28,12 +37,15 @@ interface Server {
 export default function ServersPage() {
   const [servers, setServers] = useState<Server[]>([]);
   const [vpnProfiles, setVpnProfiles] = useState<VpnProfile[]>([]);
+  const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     host: '',
     port: 22,
+    useExistingCredential: false,
+    credentialId: null as number | null,
     username: '',
     authType: 'password' as 'password' | 'key',
     password: '',
@@ -64,6 +76,7 @@ export default function ServersPage() {
   useEffect(() => {
     fetchServers();
     fetchVpnProfiles();
+    fetchCredentials();
   }, []);
 
   const fetchServers = async () => {
@@ -83,6 +96,15 @@ export default function ServersPage() {
       setVpnProfiles(data.vpn_profiles || []);
     } catch (error) {
       console.error('Failed to fetch VPN profiles:', error);
+    }
+  };
+
+  const fetchCredentials = async () => {
+    try {
+      const data = await credentialsApi.getAll();
+      setCredentials(data.credentials || []);
+    } catch (error) {
+      console.error('Failed to fetch credentials:', error);
     }
   };
 
@@ -125,25 +147,36 @@ export default function ServersPage() {
         }
       }
 
-      await serversApi.create({
+      const serverData: any = {
         name: formData.name,
         host: formData.host,
         port: formData.port,
-        username: formData.username,
-        authType: formData.authType,
-        password: formData.password,
-        privateKey: formData.privateKey,
         description: formData.description,
         requiresClient: formData.requiresClient,
         clientType: formData.requiresClient ? formData.clientType : null,
         clientConfig,
-      });
+      };
+
+      // Credential 처리
+      if (formData.useExistingCredential && formData.credentialId) {
+        serverData.credentialId = formData.credentialId;
+      } else {
+        // 새 credential 생성
+        serverData.username = formData.username;
+        serverData.authType = formData.authType;
+        serverData.password = formData.password;
+        serverData.privateKey = formData.privateKey;
+      }
+
+      await serversApi.create(serverData);
 
       setShowModal(false);
       setFormData({
         name: '',
         host: '',
         port: 22,
+        useExistingCredential: false,
+        credentialId: null,
         username: '',
         authType: 'password',
         password: '',
@@ -365,78 +398,127 @@ export default function ServersPage() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        사용자 이름 *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.username}
-                        onChange={(e) =>
-                          setFormData({ ...formData, username: e.target.value })
-                        }
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          인증 방식
-                        </label>
-                        <select
-                          value={formData.authType}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              authType: e.target.value as 'password' | 'key',
-                            })
-                          }
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        >
-                          <option value="password">비밀번호</option>
-                          <option value="key">SSH 키</option>
-                        </select>
-                      </div>
-
-                    </div>
-
-                    {formData.authType === 'password' ? (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          비밀번호 *
-                        </label>
+                    {/* Credential 선택 */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center mb-4">
                         <input
-                          type="password"
-                          required
-                          value={formData.password}
-                          onChange={(e) =>
-                            setFormData({ ...formData, password: e.target.value })
-                          }
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          SSH 개인 키 *
-                        </label>
-                        <textarea
-                          required
-                          rows={4}
-                          value={formData.privateKey}
+                          type="checkbox"
+                          id="useExistingCredential"
+                          checked={formData.useExistingCredential}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              privateKey: e.target.value,
+                              useExistingCredential: e.target.checked,
                             })
                           }
-                          placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                         />
+                        <label
+                          htmlFor="useExistingCredential"
+                          className="ml-2 block text-sm font-medium text-gray-700"
+                        >
+                          기존 인증 정보 사용
+                        </label>
                       </div>
-                    )}
+
+                      {formData.useExistingCredential ? (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            인증 정보 선택 *
+                          </label>
+                          <select
+                            required
+                            value={formData.credentialId || ''}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                credentialId: e.target.value ? parseInt(e.target.value) : null,
+                              })
+                            }
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          >
+                            <option value="">선택하세요</option>
+                            {credentials.map((cred) => (
+                              <option key={cred.id} value={cred.id}>
+                                {cred.name} ({cred.username} - {cred.auth_type})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              사용자 이름 *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={formData.username}
+                              onChange={(e) =>
+                                setFormData({ ...formData, username: e.target.value })
+                              }
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            />
+                          </div>
+
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700">
+                              인증 방식
+                            </label>
+                            <select
+                              value={formData.authType}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  authType: e.target.value as 'password' | 'key',
+                                })
+                              }
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            >
+                              <option value="password">비밀번호</option>
+                              <option value="key">SSH 키</option>
+                            </select>
+                          </div>
+
+                          {formData.authType === 'password' ? (
+                            <div className="mt-4">
+                              <label className="block text-sm font-medium text-gray-700">
+                                비밀번호 *
+                              </label>
+                              <input
+                                type="password"
+                                required
+                                value={formData.password}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, password: e.target.value })
+                                }
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                              />
+                            </div>
+                          ) : (
+                            <div className="mt-4">
+                              <label className="block text-sm font-medium text-gray-700">
+                                SSH 개인 키 *
+                              </label>
+                              <textarea
+                                required
+                                rows={4}
+                                value={formData.privateKey}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    privateKey: e.target.value,
+                                  })
+                                }
+                                placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700">

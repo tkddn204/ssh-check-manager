@@ -34,10 +34,15 @@ export async function POST(request: NextRequest) {
       };
 
       try {
+        const totalTasks = server_ids.length * command_ids.length;
+        let completedTasks = 0;
+
         sendEvent('start', {
           message: 'Batch execution started',
           total_servers: server_ids.length,
           total_commands: command_ids.length,
+          total_tasks: totalTasks,
+          progress: 0,
         });
 
         // 각 서버에 대해
@@ -46,6 +51,9 @@ export async function POST(request: NextRequest) {
 
           const server = await prisma.server.findUnique({
             where: { id: parseInt(server_id) },
+            include: {
+              credential: true,
+            },
           });
 
           if (!server) {
@@ -59,7 +67,7 @@ export async function POST(request: NextRequest) {
           sendEvent('server_start', {
             server_id,
             server_name: server.name,
-            server_host: `${server.username}@${server.host}:${server.port}`,
+            server_host: `${server.credential?.username || 'unknown'}@${server.host}:${server.port}`,
             server_index: serverIndex + 1,
             total_servers: server_ids.length,
           });
@@ -129,12 +137,18 @@ export async function POST(request: NextRequest) {
               },
             });
 
+            completedTasks++;
+            const progress = Math.round((completedTasks / totalTasks) * 100);
+
             sendEvent('command_complete', {
               server_id,
               command_id,
               command_name: command.name,
               status,
               execution_time: result.executionTime,
+              completed_tasks: completedTasks,
+              total_tasks: totalTasks,
+              progress,
             });
           }
 
@@ -149,6 +163,9 @@ export async function POST(request: NextRequest) {
           message: 'All checks completed',
           total_servers: server_ids.length,
           total_commands: command_ids.length,
+          total_tasks: totalTasks,
+          completed_tasks: completedTasks,
+          progress: 100,
         });
 
         controller.close();

@@ -29,18 +29,6 @@ export default function VpnSettingsPage() {
     fetchVpnProfiles();
   }, []);
 
-  // 주기적으로 프로세스 상태 체크 (10초마다)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      checkAllProcesses();
-    }, 10000);
-
-    // 초기 체크
-    checkAllProcesses();
-
-    return () => clearInterval(interval);
-  }, [vpnProfiles]);
-
   const fetchVpnProfiles = async () => {
     try {
       const data = await vpnApi.getAll();
@@ -49,12 +37,6 @@ export default function VpnSettingsPage() {
       console.error('Failed to fetch VPN profiles:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const checkAllProcesses = async () => {
-    for (const profile of vpnProfiles) {
-      await checkProcess(profile.id, profile.process_name);
     }
   };
 

@@ -27,8 +27,24 @@ pnpm run prisma:push
 # Create migration (production)
 pnpm run prisma:migrate
 
+# Seed database with initial data
+pnpm run prisma:seed
+
 # Open Prisma Studio (database GUI)
 pnpm run prisma:studio
+```
+
+### Data Import Scripts
+```bash
+# Import single result.json file
+pnpm run import:results
+
+# Import daily results from date-based folders (yyyy-MM-dd)
+pnpm run import:daily <directory-path>
+
+# Example:
+# pnpm run import:daily D:\CheckResults
+# Directory structure: D:\CheckResults\2024-01-01\result.json
 ```
 
 ### Development Server
@@ -96,6 +112,45 @@ return { serverId: result.serverId }
 // ✅ Correct - map to snake_case
 return { server_id: result.serverId }
 ```
+
+### Credential System
+
+Authentication credentials are **separated** from servers in a dedicated `Credential` model:
+
+**Schema Structure**:
+```prisma
+model Credential {
+  id         Int      @id @default(autoincrement())
+  name       String   // e.g., "Production SSH Key"
+  username   String
+  authType   AuthType // password or key
+  password   String?  // Encrypted with AES-256-GCM
+  privateKey String?
+  servers    Server[]
+}
+
+model Server {
+  credentialId Int?
+  credential   Credential? @relation(...)
+}
+```
+
+**Password Encryption** (`lib/crypto.ts`):
+- All passwords are encrypted using AES-256-GCM before storage
+- Encryption key stored in `.env` as `ENCRYPTION_KEY` (32-byte hex string)
+- `encrypt(plaintext)` returns encrypted string in format: `iv:authTag:encrypted`
+- `decrypt(encrypted)` returns original plaintext
+- SSH connections automatically decrypt credentials when needed
+
+**Creating Servers**:
+- Option 1: Reference existing credential by `credentialId`
+- Option 2: Provide `username`, `authType`, `password`/`privateKey` - system auto-creates credential
+- See `app/api/servers/route.ts` POST handler for implementation
+
+**SSH Execution**:
+- All SSH functions require `server` parameter with `credential` included
+- Query servers with: `prisma.server.findUnique({ include: { credential: true } })`
+- `lib/ssh.ts` automatically decrypts password from credential before connection
 
 ### SSH Command Error Detection
 
@@ -188,6 +243,39 @@ The dashboard (`app/page.tsx`) shows per-server monthly connection status:
 - Uses date-fns for date manipulation
 - Query uses DATE() function for day grouping
 
+### VPN Process Monitoring
+
+VPN profiles track process status for VPN clients (`app/vpn-settings/page.tsx`):
+- Process name monitoring (e.g., `openvpn.exe` on Windows, `openvpn` on Linux)
+- **Manual check only** - no automatic polling (removed to reduce API calls)
+- Status checked via `/api/vpn/check-process` endpoint
+- Servers can reference VPN profiles via `vpnProfileId` foreign key
+
+### Data Import from Historical Results
+
+The `import:daily` script imports check results from date-based folder structures:
+
+**Expected Directory Structure**:
+```
+D:\CheckResults\
+  ├── 2024-01-01\
+  │   ├── result.json
+  │   ├── server1.txt
+  │   └── server2.txt
+  ├── 2024-01-02\
+  │   └── result.json
+  └── ...
+```
+
+**Usage**: `pnpm run import:daily D:\CheckResults`
+
+**Important Notes**:
+- Folder names must match `yyyy-MM-dd` format
+- Each folder must contain `result.json` with structure: `{ "serverName": { "checkName": "resultText" } }`
+- Results are saved with `checkedAt` timestamp matching the folder date
+- Server names and check command names must exist in database before import
+- Missing servers or commands are skipped with warnings
+
 ## File Naming Conventions
 
 - API routes: `app/api/[resource]/route.ts` or `app/api/[resource]/[id]/route.ts`
@@ -198,8 +286,16 @@ The dashboard (`app/page.tsx`) shows per-server monthly connection status:
 ## Environment Variables
 
 Required in `.env`:
-```
+```bash
+# Database connection
 DATABASE_URL="mysql://user:password@host:port/ssh_check_manager"
+
+# Credential encryption (32-byte hex string)
+ENCRYPTION_KEY="0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b"
 ```
 
-The application will not start without a valid database connection.
+**Important**:
+- The application will not start without a valid database connection
+- `ENCRYPTION_KEY` is required for encrypting/decrypting credentials
+- Generate a new key with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+- **Never commit** `.env` to version control
