@@ -120,17 +120,6 @@ export default function Dashboard() {
     return { hasConnection, totalSuccess, totalFailed };
   };
 
-  const getDayStatusColor = (date: Date) => {
-    const status = getDayStatus(date);
-    if (!status || !status.hasConnection) {
-      return 'bg-gray-100 text-gray-400';
-    }
-    if (status.totalFailed > 0) {
-      return 'bg-red-100 text-red-800 border-red-500';
-    }
-    return 'bg-green-100 text-green-800 border-green-500';
-  };
-
   const isCurrentMonth = (date: Date) => {
     if (!data) return false;
     return date.getMonth() === data.month - 1;
@@ -187,57 +176,6 @@ export default function Dashboard() {
         <p className="mt-2 text-sm text-gray-600">
           서버별 월간 접속 현황을 확인하세요
         </p>
-      </div>
-
-      {/* 빠른 시작 */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">빠른 시작</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Link
-            href="/servers"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
-          >
-            <div className="flex-shrink-0">
-              <span className="text-2xl">➕</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">서버 추가</p>
-              <p className="text-sm text-gray-500 truncate">
-                새로운 서버 등록
-              </p>
-            </div>
-          </Link>
-
-          <Link
-            href="/checks"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
-          >
-            <div className="flex-shrink-0">
-              <span className="text-2xl">🔍</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">점검 실행</p>
-              <p className="text-sm text-gray-500 truncate">
-                서버 상태 점검
-              </p>
-            </div>
-          </Link>
-
-          <Link
-            href="/reports"
-            className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
-          >
-            <div className="flex-shrink-0">
-              <span className="text-2xl">📈</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">리포트 보기</p>
-              <p className="text-sm text-gray-500 truncate">
-                일별/월별 통계
-              </p>
-            </div>
-          </Link>
-        </div>
       </div>
 
       {/* 월간 접속 현황 */}
